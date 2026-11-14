@@ -3,8 +3,9 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
-import {Store,originalStoreExecutionCustodyFrom,originalStoreRetainedCommitCutoffFrom,retainOriginalStoreCommitCutoffFrom as retainStoreCutoff} from '../store.mjs';
+import {Store,originalStoreExecutionCustodyFrom,originalStoreRetainedCommitCutoffFrom,inspectRuntimeStoreCommitWitnessFrom,retainOriginalStoreCommitCutoffFrom as retainStoreCutoff} from '../store.mjs';
 import {readNormalized} from '../record-storage.mjs';
+import {prepareRuntimeOriginalModelAuthorityFrom,assertRuntimeOriginalModelAuthorityFrom} from '../runtime-execution.mjs';
 import {bindSnapshots,resolveSnapshotEntry} from '../snapshot.mjs';
 import {dataDir} from '../plugin-data.mjs';
 import {inspectOriginalUpgradeLaunchCutoffFrom} from '../upgrade.mjs';
@@ -12,7 +13,7 @@ import {inspectOriginalAdapterModelCutoffFrom} from '../adapters.mjs';
 import {validateContext as validatePeerTaskContext} from './model.mjs';
 import {PeerLedger,FAMILIES,canonical,originalPeerExecutionCustodyFrom,originalPeerExecutionLedgerFrom} from './ledger.mjs';
 import {validateBootstrapMembershipOwnedClosure} from './bootstrap-membership-contract.mjs';
-import {jobTimeoutState,TERMINATION_GRACE_MS} from '../timeout.mjs';
+import {jobTimeoutState,normalizeTimeout,TERMINATION_GRACE_MS} from '../timeout.mjs';
 import * as originalAdapter from '../adapters.mjs';
 import * as originalProtectedDomain from './protected-codex-domain.mjs';
 import * as originalMechanicalQa from './origin-mechanical-qa-policy.mjs';
@@ -89,6 +90,8 @@ function generation(){
   }
   return digest({protocol:'original-local-execution-source-v1',legacy_unit:LEGACY_UNIT,maintenance_unit:PEER_UNIT,files:rows});
 }
+// Node-only fixed Source metadata, not a Native-support lookup or a grant.
+export function inspectOriginalSourceGenerationFrom(){need(arguments.length===0,'SOURCE_GENERATION_ARGUMENTS');return generation();}
 function key(raw){if(!raw.startsWith('~json:'))return raw;let value;try{value=JSON.parse(raw.slice(6));}catch{need(false,'STORAGE_KEY');}need(typeof value==='string','STORAGE_KEY');return value;}
 function storedProjection(loan){
   const layout=query(loan,"SELECT 1 FROM sqlite_master WHERE type='table' AND name='state_entries'",'get');
@@ -185,6 +188,7 @@ function originalFacts(history){
 export function inspectOriginalLocalExecutionInventoryFrom(actualDb){const loan=originalStoreExecutionCustodyFrom(actualDb);return check(loan,()=>originalFacts(originalHistory(loan)));}
 
 const writes=new WeakMap(),launchTokens=new WeakMap();
+const modelRequestCommits=new WeakMap();
 // Direct-child observations stay private after a token is consumed. Ordinary
 // callback DATA cannot manufacture the physical model-call completion proof.
 const ordinaryModelObservations=new WeakMap();
@@ -308,9 +312,39 @@ export function validateOriginalStoreExecutionCommitFrom(store){
   w.validated_issuance=true;
   w.validated_sequence=history.event_sequence;
   if(w.upgrade_cutoff_record){upgradeDeadline(w.upgrade_cutoff_record);if(w.upgrade_cutoff_record.launch.kind==='model')modelAdapterDeadline(w.upgrade_cutoff_record);}
+  for(const token of w.tokens){const r=launchTokens.get(token);if(r.request_input_binding){need(r.request_authority&&hex(r.request_assignment_sha256),'MODEL_REQUEST_CURRENT_REQUIRED');const bounds=assertRuntimeOriginalModelAuthorityFrom(r.request_authority,store,w.loan.scope,r.job_id);clipModelRequestCutoff(r,bounds);}}
+  if(w.model_request_current){const r=launchTokens.get(w.model_request_current),bounds=assertOriginalModelRequestCurrentFrom(w.model_request_current,store);clipModelRequestCutoff(r,bounds);w.launch_cutoff=Math.min(w.launch_cutoff??Infinity,r.deadline_at_ms);}
   assertUpgradeCommitCutoff(w,history);
 }
-export function commitOriginalStoreExecutionWriteFrom(store){const w=writes.get(store);if(!w)return;need(w.loan.db.isTransaction===false,'COMMIT_REQUIRED');if(w.approved.size||w.tokens.length||w.upgrade_tokens.length)need(w.issuance_sealed&&w.validated_issuance&&positive(w.validated_sequence),'UNPERSISTED_ISSUANCE');for(const token of w.tokens){const r=launchTokens.get(token);need(positive(w.validated_sequence),'WRITE_REQUIRED');r.committed=true;r.event_sequence=w.validated_sequence;}for(const token of w.upgrade_tokens){const r=upgradeTokens.get(token);r.committed=true;r.event_sequence=w.validated_sequence;}w.lease.status='committed';}
+export function commitOriginalStoreExecutionWriteFrom(store){const w=writes.get(store);if(!w)return;need(w.loan.db.isTransaction===false,'COMMIT_REQUIRED');if(w.approved.size||w.tokens.length||w.upgrade_tokens.length)need(w.issuance_sealed&&w.validated_issuance&&positive(w.validated_sequence),'UNPERSISTED_ISSUANCE');for(const token of w.tokens){const r=launchTokens.get(token);need(positive(w.validated_sequence),'WRITE_REQUIRED');if(r.request_input_binding)r.request_commit_ready=true;else r.committed=true;r.event_sequence=w.validated_sequence;}for(const token of w.upgrade_tokens){const r=upgradeTokens.get(token);r.committed=true;r.event_sequence=w.validated_sequence;}w.lease.status='committed';}
+// Called only from the fixed runtime Store commit hook with its lexical
+// witness. The older committed bit alone is not a retained physical proof.
+export function retainOriginalModelRequestCommitFrom(store,witness){
+  const facts=inspectRuntimeStoreCommitWitnessFrom(witness,store),w=writes.get(store);
+  need(w&&w.loan.store===store&&w.loan.scope===facts.scope&&w.loan.root===facts.root&&w.lease.status==='committed','MODEL_REQUEST_COMMIT_REQUIRED');
+  const confirmations=[],ready=[];
+  for(const token of w.tokens){
+    const r=launchTokens.get(token);if(!r?.request_input_binding)continue;
+    need(w.type==='job.model_process.launch_requested'&&w.issuance_sealed&&w.validated_issuance&&positive(w.validated_sequence)&&r.store===store&&r.launch.kind==='model'&&r.request_commit_ready===true&&r.request_authority&&hex(r.request_assignment_sha256)&&!r.committed&&!r.invalid&&!r.consumed&&!modelRequestCommits.has(token),'MODEL_REQUEST_COMMIT_REQUIRED');
+    ready.push(r);confirmations.push([token,Object.freeze({protocol:'runtime-model-request-commit-v1',stage:'request',lane:'original',store,db:w.loan.db,root:facts.root,scope:facts.scope,type:w.type,job_id:r.job_id,instance_id:r.instance_id,invocation_id:r.launch.invocation_id,input_binding:r.request_input_binding,timeout_policy:r.request_timeout_policy})]);
+  }
+  // Every throwing guard/allocation precedes arming the new opt-in tokens.
+  for(const [token,confirmation]of confirmations)modelRequestCommits.set(token,confirmation);
+  for(const r of ready)r.committed=true;
+}
+export function inspectOriginalModelRequestCommitFrom(token,issuingStore){
+  const r=launchTokens.get(token),facts=modelRequestCommits.get(token);
+  need(r&&r.launch.kind==='model'&&r.committed&&r.request_input_binding&&facts&&r.store===issuingStore&&facts.store===issuingStore,'MODEL_REQUEST_COMMIT_REQUIRED');
+  return facts;
+}
+// Select Store's existing final native clock/bound COMMIT path only for
+// genuinely prepared opt-in model requests or their actual creation write.
+export function originalModelRequestUsesNativeCommitFrom(store){
+  const w=writes.get(store);if(!w)return false;
+  if(w.type==='job.model_process.launch_requested')return w.tokens.some(token=>{const r=launchTokens.get(token);return Boolean(r?.request_input_binding&&r.request_authority);});
+  if(w.type==='job.original_execution.born'&&w.model_request_current){const r=launchTokens.get(w.model_request_current);return Boolean(r?.request_input_binding&&r.request_authority&&r.consumed);}
+  return false;
+}
 export function originalStoreExecutionCommitCutoffFrom(store){
   const w=writes.get(store);if(!w)return null;originalStoreExecutionCustodyFrom(store);
   const policy=originalStoreRetainedCommitCutoffFrom(store);let cutoff=w.launch_cutoff;
@@ -351,6 +385,44 @@ export function prepareOriginalWorkerLaunchFrom(store,state,input){
   const mechanical=mechanicalQaLaunchCandidate(state,job)?mechanicalQaLaunchAuthority(store,state,job):null,deadline_at_ms=Math.min(originalJobCutoff(state,job,input.kind),mechanical?.deadline_at_ms??Infinity),launch={launch_id:randomUUID(),kind:input.kind,invocation_id:input.kind==='model'?input.invocation_id:null,requested_at:time(),controller_pid:process.pid,birth:null,closure:null};launches.push(launch);approve(w,job);
   const token=Object.freeze({});launchTokens.set(token,{store,root:w.loan.root,job_id:job.id,instance_id:job.instance_id,host:job.host,origin:copy(w.history.origin),launch:copy(launch),deadline_at_ms,mechanical_qa:mechanical===null?null:copy(mechanical.binding),signal:null,adapter_cutoff_bound:false,committed:false,consumed:false,invalid:false});w.tokens.push(token);return token;
 }
+function requestInputBinding(input){
+  need(closed(input,['host','native_id','prompt','cwd','selection'])&&['codex','claude'].includes(input.host)&&(input.native_id===null||typeof input.native_id==='string')&&typeof input.prompt==='string'&&typeof input.cwd==='string'&&path.isAbsolute(input.cwd),'MODEL_REQUEST_INPUT_REQUIRED');
+  return Object.freeze({host:input.host,native_id:input.native_id,prompt_sha256:hash(input.prompt),prompt_utf16_sha256:createHash('sha256').update(input.prompt,'utf16le').digest('hex'),prompt_utf16_units:input.prompt.length,cwd:path.resolve(input.cwd),selection_sha256:hash(JSON.stringify(input.selection))});
+}
+// An opt-in ordinary Original request. Existing worker preparation stays
+// unchanged; its unbound tokens cannot supply committed-input confirmations.
+// This binds private input to issuance, not prompt bytes in canonical storage.
+export function prepareOriginalModelRequestFrom(store,state,input){
+  need(closed(input,['job_id','invocation_id','host','native_id','prompt','cwd','selection']),'MODEL_REQUEST_INPUT_REQUIRED');
+  const binding=requestInputBinding({host:input.host,native_id:input.native_id,prompt:input.prompt,cwd:input.cwd,selection:input.selection}),w=writeContext(store,state);
+  need(w.type==='job.model_process.launch_requested'&&state.jobs?.[input.job_id]?.host===binding.host,'MODEL_REQUEST_INPUT_REQUIRED');
+  const job=state.jobs[input.job_id],policy=Object.freeze(normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason}));
+  const token=prepareOriginalWorkerLaunchFrom(store,state,{job_id:input.job_id,kind:'model',invocation_id:input.invocation_id});
+  const r=launchTokens.get(token);r.request_input_binding=binding;r.request_timeout_policy=policy;
+  r.request_authority=prepareRuntimeOriginalModelAuthorityFrom(store,state,job);r.request_assignment_sha256=modelRequestAssignment(job);return token;
+}
+function modelRequestAssignment(job){
+  const a=job.original_execution_assignment;
+  return digest({...a,launches:a.launches.map(launch=>({...launch,birth:null,closure:null}))});
+}
+function clipModelRequestCutoff(record,bounds){
+  for(const deadline of [bounds.authority_deadline_at_ms,bounds.execution_deadline_at_ms])if(deadline!==null)record.deadline_at_ms=Math.min(record.deadline_at_ms,finiteCutoff(deadline));
+}
+// Read current Source authority for the actual opt-in token before invocation
+// and after consumption. This does not replace physical closure/timing guards.
+export function assertOriginalModelRequestCurrentFrom(token,issuingStore){
+  const facts=inspectOriginalModelRequestCommitFrom(token,issuingStore),r=launchTokens.get(token);
+  need(!r.invalid&&!r.store.closed&&r.request_authority,'MODEL_REQUEST_CURRENT_REQUIRED');
+  if(r.signal!==null&&r.signal!==undefined)need(!Reflect.apply(abortedGetter,r.signal,[]),'MODEL_REQUEST_ABORTED');
+  return r.store.readSnapshot(()=>{
+    const loan=originalStoreExecutionCustodyFrom(r.store),history=originalHistory(loan),job=history.jobs[r.job_id];
+    const assignment=job?.original_execution_assignment,worker=assignment?.launches.find(x=>x.kind==='worker'),launch=assignment?.launches.find(x=>x.launch_id===r.launch.launch_id),entry=job?.model_process_tracking?.invocations?.find(x=>x.invocation_id===r.launch.invocation_id);
+    need(job&&job.status==='running'&&job.instance_id===r.instance_id&&job.host===r.host&&job.worker_pid===process.pid&&same(history.origin,r.origin)&&worker?.birth?.pid===process.pid&&worker.closure===null&&launch&&entry&&job.model_process_tracking.current===r.launch.invocation_id&&entry.job_id===r.job_id&&entry.instance_id===r.instance_id&&entry.worker_pid===process.pid&&modelRequestAssignment(job)===r.request_assignment_sha256,'MODEL_REQUEST_ASSIGNMENT_CHANGED');
+    const bounds=assertRuntimeOriginalModelAuthorityFrom(r.request_authority,r.store,facts.scope,r.job_id),physical=ordinaryModelObservations.get(token);
+    if(physical?.closed)for(const deadline of [bounds.authority_deadline_at_ms,bounds.execution_deadline_at_ms])if(deadline!==null)need(physical.closed.at_ms<deadline,'MODEL_OVERALL_DEADLINE_EXPIRED');
+    return bounds;
+  });
+}
 function tokenRecord(token,kind){const r=launchTokens.get(token);need(r&&!r.invalid&&r.committed&&!r.consumed&&(!kind||r.launch.kind===kind)&&r.launch.controller_pid===process.pid,'PRIVATE_LAUNCH_REQUIRED');need(r.origin.source_generation_sha256===generation(),'SOURCE_GENERATION_CHANGED');need(!r.store.closed,'STORE_EXPIRED');r.store.readSnapshot(()=>{const loan=originalStoreExecutionCustodyFrom(r.store),history=originalHistory(loan),job=history.jobs[r.job_id];need(job&&job.instance_id===r.instance_id&&!terminal(job.status)&&same(history.origin,r.origin)&&job.original_execution_assignment.launches.some(l=>same(l,r.launch)),'LAUNCH_CHANGED');});return r;}
 export function assertOriginalWorkerLaunchToken(token,{kind}={}){const r=tokenRecord(token,kind);finalLaunchCutoff(r);return true;}
 export function bindOriginalAdapterLaunchCutoffFrom(token,loan){
@@ -370,6 +442,7 @@ export function spawnOriginalWorkerLaunch(token,command,args,options={}){
   // real creation. A failed COMMIT leaves the pre-existing intent UNKNOWN.
   try{r.store.transaction('job.original_execution.born',state=>{const w=writeContext(r.store,state),job=state.jobs?.[r.job_id];need(w.history&&job&&job.instance_id===r.instance_id&&same(w.history.origin,r.origin)&&!terminal(job.status),'ASSIGNMENT_CHANGED');const l=job.original_execution_assignment.launches.find(x=>x.launch_id===r.launch.launch_id);need(l&&same(l,r.launch),'LAUNCH_CHANGED');r.consumed=true;
     if(r.mechanical_qa!==null){const current=mechanicalQaLaunchAuthority(r.store,state,job,r.mechanical_qa);r.deadline_at_ms=Math.min(r.deadline_at_ms,current.deadline_at_ms);const history=originalHistory(w.loan);need(same(history.jobs[r.job_id],job)&&same(history.origin,r.origin),'LAUNCH_CHANGED');}
+    if(r.request_input_binding){const bounds=assertOriginalModelRequestCurrentFrom(token,r.store);clipModelRequestCutoff(r,bounds);w.model_request_current=token;}
     w.launch_cutoff=r.deadline_at_ms;
     finalLaunchCutoff(r);
     child=spawn(command,args,options);need(child&&typeof child.once==='function','ORIGINAL_CHILD_REQUIRED');
@@ -813,7 +886,13 @@ function modelBinding(r,input){
 export function assertOriginalModelLaunchToken(token,input){
   const peer=rawPeerModelTokens.get(token);if(peer){modelBinding(peer,input);need(!peer.invalid&&!peerTokens.get(peer.original)?.consumed,'PRIVATE_PEER_MODEL_LAUNCH_REQUIRED');return Object.freeze({kind:'peer-model',deadline_at_ms:peer.deadline_at_ms});}
   const upgrade=upgradeTokens.get(token);if(upgrade){need(upgrade.launch.kind==='model','MODEL_TOKEN_KIND_CHANGED');currentUpgradeLaunch(upgrade);modelBinding(upgrade,input);return Object.freeze({kind:'upgrade-model',deadline_at_ms:upgrade.launch.deadline_at_ms});}
-  assertOriginalWorkerLaunchToken(token,{kind:'model'});return Object.freeze({kind:'legacy-model',deadline_at_ms:null});
+  assertOriginalWorkerLaunchToken(token,{kind:'model'});const ordinary=launchTokens.get(token);
+  if(ordinary.request_input_binding){
+    need(same(ordinary.request_input_binding,requestInputBinding(input)),'MODEL_INPUT_CHANGED');
+    const bounds=assertOriginalModelRequestCurrentFrom(token,ordinary.store),deadlines=[bounds.authority_deadline_at_ms,bounds.execution_deadline_at_ms].filter(value=>value!==null);
+    return Object.freeze({kind:'legacy-model',deadline_at_ms:deadlines.length?Math.min(...deadlines):null});
+  }
+  return Object.freeze({kind:'legacy-model',deadline_at_ms:null});
 }
 export function spawnOriginalModelLaunch(token,command,args,options){
   const peer=rawPeerModelTokens.get(token);
