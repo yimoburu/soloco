@@ -104,7 +104,15 @@ function controlledBoundary(t){
             const init=fs.fstatSync(options.stdio[6],{bigint:true});assert(init.isFile());assert.equal(String(init.dev),request.init.identity.dev);assert.equal(String(init.ino),request.init.identity.ino);assert.equal(init.mode&0o777n,0o400n);
           }
         }
-        effects.push({kind:'real fixed Source Python IO',protocol:request.protocol,operation:request.operation,program_sha256:hash(args[4])});return Reflect.apply(originalSync,childProcess,invocation);
+        effects.push({kind:'real fixed Source Python IO',protocol:request.protocol,operation:request.operation,program_sha256:hash(args[4])});
+        const began=process.hrtime.bigint();
+        const diagnose=(result,problem)=>{try{
+          const stream=value=>{const text=Buffer.isBuffer(value)?value.toString('utf8'):typeof value==='string'?value:'';return {bytes:Buffer.isBuffer(value)?value.length:Buffer.byteLength(text),head:text.slice(0,512),tail:text.length>512?text.slice(Math.max(512,text.length-512)):'',truncated:text.length>1024};};
+          t.diagnostic(JSON.stringify({protocol:'issue18-source-io-fixture-failure-v1',program:kind,operation:request.operation,timeout_ms:options.timeout,elapsed_ms:Number(process.hrtime.bigint()-began)/1e6,pid:Number.isSafeInteger(result?.pid)?result.pid:null,status:Number.isSafeInteger(result?.status)?result.status:null,signal:typeof result?.signal==='string'?result.signal.slice(0,64):null,error_code:typeof (problem??result?.error)?.code==='string'?(problem??result.error).code.slice(0,64):null,stdout:stream(result?.stdout),stderr:stream(result?.stderr)}));
+        }catch{/* Diagnostic failures cannot change the actual Source IO result. */}};
+        let result;try{result=Reflect.apply(originalSync,childProcess,invocation);}catch(problem){diagnose(null,problem);throw problem;}
+        if(result?.error||result?.status!==0||result?.signal!=null)diagnose(result,null);
+        return result;
       }
       if(command==='/usr/bin/otool'){
         assert.deepEqual(args,['-L',node]);assert.equal(options.encoding,'utf8');assert(options.timeout>0&&options.timeout<=5000);assert.equal(options.maxBuffer,100000);assert.deepEqual(options.env,{PATH:'/usr/bin:/bin'});
