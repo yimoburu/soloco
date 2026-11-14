@@ -22,6 +22,13 @@ import {assertOriginalModelLaunchToken,prepareOriginalUpgradeModelLaunchFrom} fr
 async function sourceFixture(t,{historical=false,review_window_minutes=45,call_timeout_minutes=10,failModelCommit=false}={}){
   const team={...installedTeam(),plugin_version:'0.7.7'};
   const f=historical?await historicalInventoryStore(t,{sourceState:fictionalInventoryState(storeModule,{extra:{...team,team_sha256:teamHash(team)}})}):await freshInventoryStore(t,{stateOptions:{extra:{...team,team_sha256:teamHash(team)}}});
+  // Upgrade snapshots require explicit normalized storage. Migrate only this
+  // fresh Original fixture; the historical admission negative stays untouched.
+  if(!historical){
+    const original=f.state(),migration=f.store.migrate();
+    assert.equal(migration.format,'normalized-v4');assert.equal(migration.originals_preserved,true);
+    assert.deepEqual(f.state(),original,'explicit fixture migration preserves the exact Original state');
+  }
   const oldData=process.env.COMPANY_PLUGIN_DATA,ownedData=path.join(f.root,'SOURCE-managed-data');process.env.COMPANY_PLUGIN_DATA=ownedData;
   t.after(()=>{if(oldData===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=oldData;});
   const a={root:f.root,session_id:f.state().owner.session_id,expected_epoch:f.state().owner.epoch};bind(f.root,a.session_id,'codex');
@@ -48,7 +55,7 @@ async function sourceFixture(t,{historical=false,review_window_minutes=45,call_t
     return child;
   });
   for(const method of ['spawnSync','exec','execSync','execFile','execFileSync','fork'])t.mock.method(childProcess,method,()=>{throw Error('SOURCE fixture forbids real '+method);});
-  syncBuiltinESMExports();t.after(()=>{for(const {child}of children)child.complete();spawn.restore();syncBuiltinESMExports();});
+  syncBuiltinESMExports();t.after(()=>{for(const {child}of children)child.complete();spawn.mock.restore();syncBuiltinESMExports();});
   const prepare=()=>{
     const current=f.state(),candidate=upgrade({...a,expected_epoch:current.owner.epoch,action:'inspect'},'codex');
     const prepared=upgrade({...a,expected_epoch:current.owner.epoch,action:'prepare',candidate_hash:candidate.candidate_hash,context_mode:'full',workflow:'incremental-v2',review_window_minutes,call_timeout_minutes,source_instruction:'SYNTHETIC fresh upgrade Source test; no actual company or Native authority.'},'codex',{check:()=>({available:true,authenticated:true})});
