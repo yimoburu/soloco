@@ -81,3 +81,9 @@ test('a hook record for another session or without an invocation scope is held',
  await runWithMcpHostContext('claude',{},()=>assert.throws(()=>peerCallerActor({root,session_id:OTHER},'claude',{hookBound:true}),e=>e.code==='PEER_CURRENT_HOOK_REQUIRED'));
  assert.throws(()=>peerCallerActor({root,session_id:ID},'claude',{hookBound:true}),e=>e.code===CODE);
 });
+
+test('host-supplied identity metadata naming another session refuses the weak tier',async()=>{
+ const OTHER='018f22aa-bb1c-7def-8123-123456789abc';
+ await runWithMcpHostContext('claude',{threadId:OTHER,sessionId:OTHER},()=>held(()=>requireClaudeHookBoundActor(sel())));
+ await runWithMcpHostContext('claude',{threadId:ID,sessionId:ID},()=>assert.equal(requireClaudeHookBoundActor(sel()).session_id,ID));
+});

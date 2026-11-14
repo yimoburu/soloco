@@ -92,9 +92,10 @@ export function requireCodexRootActor(input){
  * well-formed UUID. It cannot distinguish a root chat from a descendant that knows
  * the session ID. It is never native identity, never grants authority, and callers
  * must additionally require the current managed hook record for the same actor and
- * must restrict themselves to read-only operations. */
+ * must restrict themselves to read-only operations. If the host ever supplies
+ * valid identity metadata naming a different session, the tier is refused. */
 export function requireClaudeHookBoundActor(input){
  const state=current(input);
- if(!state.active||!state.hostMatches||state.selected.host!=='claude'||state.selected.session===null)throw Object.assign(new Error(HOOK_BOUND_MESSAGE),{code:HOOK_BOUND_CODE});
+ if(!state.active||!state.hostMatches||state.selected.host!=='claude'||state.selected.session===null||state.observed&&!state.matches)throw Object.assign(new Error(HOOK_BOUND_MESSAGE),{code:HOOK_BOUND_CODE});
  return Object.freeze({host:'claude',session_id:state.selected.session,native_id:null,tier:'HOOK_BOUND'});
 }
