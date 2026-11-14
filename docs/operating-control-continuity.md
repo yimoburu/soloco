@@ -20,8 +20,11 @@ Resume now checks a prospective view containing its own new audit before
 unpausing. A condition-bearing resume is rejected atomically; no successful
 resume is reported and no company mutation occurs. Record and independently
 accept new conditions through the existing preservation/publication APIs before
-issuing a literal resume. Conditional pause and handover audits remain durable,
-visible DIRTY frontier entries until independently accepted. Public tool argument
+issuing a literal resume. Conditional pause audits and previously retained
+conditional handover audits remain durable, visible DIRTY frontier entries until
+independently accepted. A new conditional handover with an accepted checkpoint
+is rejected without persisting its audit; record and accept its conditions
+separately before issuing a literal handover. Public tool argument
 validation continues to reject unknown request fields. Unknown legacy records
 remain held on first pass.
 
@@ -73,7 +76,7 @@ operating transfer then uses v4 reconstruction, including when the optional
 protocol is omitted. Exact independent v4 QA and confirmed closure still precede
 resume. Historical frozen-parent authority is not renewed for the new owner.
 
-This reconciles the implementation with adopted SPEC v0.21 §§6–8: usable current
+This reconciles the implementation with repository SPEC v0.21 §§6–8: usable current
 context, retained history and failures, checked replacement, and disclosed
 capability limits. It changes no governing principle or public tool argument.
 The focused synthetic regression covers frozen intake through successor
