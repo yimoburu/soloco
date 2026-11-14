@@ -24,9 +24,10 @@ establish these source mechanics, not connected-host or native qualification.
 
 ## New peer access
 
-Every public `company_peers` operation, including status and persisted reads,
-requires this root caller context. This prevents an unqualified legacy path from
-becoming an alternative route into layout-5 peer data or production authority.
+Every Codex `company_peers` operation, including status and persisted reads,
+requires this root caller context. Claude has the explicit weaker read-only
+exception below; every other peer action retains the Codex-root requirement.
+Neither tier admits an unqualified legacy route to production authority.
 The current managed hook record must also match the actor, canonical folder,
 plugin version/root and MCP data directory. Its bounded no-follow descriptor read
 checks actual file and directory identity and file stability. Binding-file
@@ -35,9 +36,10 @@ existence alone is not identity proof.
 The peer runtime still checks the actual canonical founder, owner epoch and
 operation-specific grants, policy, qualification and physical commit fences.
 Caller identity does not create a grant, start a provider, qualify an executor or
-release a reservation. Unsupported clients, malformed/missing metadata,
-descendants and mismatched selectors Hold before peer access. Claude has no
-reviewed equivalent identity contract for these new routes.
+release a reservation. Unsupported clients and malformed, missing or mismatched
+selectors Hold before peer access. Codex descendants and missing or malformed
+Codex HOST metadata also Hold. Claude has no reviewed equivalent native identity
+contract; its permitted read-only tier below does not attest a root caller.
 
 ### Claude hook-bound tier (weaker, read-only)
 
@@ -53,9 +55,9 @@ or descendant that knows the session ID, because Claude exposes no descendant
 marker. It never satisfies `requireCodexRootActor`, `native_identity_proof` and
 `native_qualification` stay false, and the canonical founder, owner epoch and
 operator checks inside the peer runtime still apply. Every mutating or
-provider-starting peer action, the owner and origin lifecycle routes and the
-development budget remain Codex-root only. `company_doctor.caller_identity`
-reports `hook_bound_tier_eligible` as data only.
+provider-starting peer action and the owner and origin lifecycle routes remain
+Codex-root only. This opt-in does not change any other route's caller requirement.
+`company_doctor.caller_identity` reports `hook_bound_tier_eligible` as data only.
 
 `company_doctor.caller_identity` reports bounded observations without exposing
 thread/session IDs. `authority_granted` and `native_qualification` remain false.

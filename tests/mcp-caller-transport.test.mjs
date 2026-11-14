@@ -13,8 +13,9 @@ import {DatabaseSync} from 'node:sqlite';
 import {peerFixture} from './peer-fixture.mjs';
 import {canonical,peerDigest} from '../plugins/soloco/runtime/peers/ledger.mjs';
 import {Store,installedTeam,teamHash,digest} from '../plugins/soloco/runtime/store.mjs';
-import {bind} from '../plugins/soloco/runtime/engine.mjs';
+import {bind,peerCallerActor} from '../plugins/soloco/runtime/engine.mjs';
 import {hook} from '../plugins/soloco/runtime/main.mjs';
+import {runWithMcpHostContext} from '../plugins/soloco/runtime/mcp-host-context.mjs';
 
 const ENTRY=fileURLToPath(new URL('../plugins/soloco/runtime/main.mjs',import.meta.url));
 const ROOT='123e4567-e89b-12d3-a456-426614174000',CHILD='123e4567-e89b-42d3-8456-426614174001',OTHER='018f22aa-bb1c-7def-8123-123456789abc';
@@ -69,7 +70,7 @@ function mcpServer(root,cache,host){
   }
  };
 }
-function fixture(t,{legacyHost=null}={}){
+function fixture(t,{legacyHost=null,peerHost='codex'}={}){
  const cache=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-caller-cache-')),previous=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=cache;
  let root,file,db,peer,session=ROOT,host='codex';const servers=[];
  if(legacyHost){
@@ -78,7 +79,8 @@ function fixture(t,{legacyHost=null}={}){
   try{store.transaction('fictional.transport-genesis',()=>({schema:2,id:'fictional-legacy-caller-company',name:'Fictional legacy preparation',idea:'No execution or adoption.',runtime_version:team.plugin_version,...team,team_sha256:teamHash(team),owner:{host,session_id:session,epoch:7},paused:true,records:{held:{id:'held',kind:'artifact',revision:1,content:'FAILED; ZERO allowance; no automatic retry.'}},jobs:{},sessions:{},notices:[],messages:[],context_classifications:{},unknown_future:{attempts_used:4,max_attempts:4}}));store.migrate();}finally{store.close();}
   db=new DatabaseSync(file);
  }else{
-  peer=peerFixture({principals:{founder:{native_id:ROOT,session_id:ROOT,legacy_owner:{host:'codex',session_id:ROOT,epoch:7}}}});({root,file}=peer);db=peer.ledger.db;
+   host=peerHost;
+   peer=peerFixture({principals:{founder:{host,native_id:ROOT,session_id:ROOT,legacy_owner:{host,session_id:ROOT,epoch:7}}}});({root,file}=peer);db=peer.ledger.db;
   peer.ledger.write('fictional.persisted-transport-result','founder',tx=>tx.put('tasks','persisted-task',{status:'returned',scope:'alpha',owner_principal_id:'cos-a',result:{output:'Persisted fictional transport result.',termination_confirmed:false}},0));
  }
  function bindSession(id=session,selectedHost=host){
@@ -150,6 +152,28 @@ test('Claude hook-bound tier reaches only read routes and still needs the canoni
  denied(await server.call('company_peers',f.args('status'),rootMeta(ROOT)),/Current canonical founder operator/);
  for(const action of ['start','tick','stop'])denied(await server.call('company_peers',f.args(action),rootMeta(ROOT)),ROOT_HOLD);
  unchanged(f.db,before);
+});
+
+test('actual Claude hook-bound stdio reads the canonical Claude founder status and persisted results without native identity',async t=>{
+  // The canonical Claude principal is fictional persisted DATA. Its stored
+  // native_id is not a native proof or the weak caller's native_id.
+  const f=fixture(t,{peerHost:'claude'}),before=sqlState(f.db);
+  const actor=await runWithMcpHostContext('claude',undefined,()=>peerCallerActor(f.args('status'),'claude',{hookBound:true}));
+  assert.deepEqual(actor,{host:'claude',session_id:ROOT,native_id:null,tier:'HOOK_BOUND'});assert.equal(Object.isFrozen(actor),true);
+  const server=await f.start();
+  // The real Claude MCP process receives no synthetic Codex HOST identity.
+  const status=payload(await server.call('company_peers',f.args('status')));assert.equal(status.started,false);
+  const page=payload(await server.call('company_peers',f.args('inspect',{family:'tasks',part:'result',status:'returned'}))),source=page.items[0].source;
+  assert.equal(source.id,'persisted-task');
+  const value=payload(await server.call('company_peers',f.args('read',{family:source.family,id:source.id,revision:source.revision,sha256:source.sha256,part:source.part})));
+  assert.equal(value.complete,true);assert.equal(JSON.parse(value.text).output,'Persisted fictional transport result.');
+  denied(await server.call('company_peers',f.args('status',{}, {epoch:8})),/Current canonical founder operator/);
+  f.bindSession(OTHER,'claude');
+  denied(await server.call('company_peers',f.args('status',{}, {session_id:OTHER})),/Current canonical founder operator/);
+  for(const action of ['start','tick','stop'])denied(await server.call('company_peers',f.args(action)),ROOT_HOLD);
+  // Include the unchanged watcher's next idle poll in the read-only check.
+  await new Promise(resolve=>setTimeout(resolve,2100));
+  unchanged(f.db,before);assert.equal(fs.existsSync(path.join(f.root,'.company','peer-execution')),false);
 });
 
 for(const host of ['codex','claude'])test('legacy '+host+' read-only adoption stays logically compatible and explicitly unqualified without root metadata',async t=>{
