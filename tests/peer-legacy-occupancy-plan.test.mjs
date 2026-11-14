@@ -35,10 +35,25 @@ export function capturePeerOriginCut(db){
 }
 export function validatePeerOriginMechanicalReview(){throw Object.assign(Error('SYNTHETIC_NATIVE_QA_PRODUCER_UNAVAILABLE'),{code:'SYNTHETIC_NATIVE_QA_PRODUCER_UNAVAILABLE'});}
 `;
+function installOccupancyPlanSourceFixture(root){
+  const current=path.join(root,'SOURCE-plugin/runtime'),legacy=path.join(root,'LEGACY-SOURCE/runtime');
+  fs.mkdirSync(path.dirname(current),{recursive:true});fs.cpSync(runtime,current,{recursive:true});
+  fs.mkdirSync(path.join(legacy,'peers'),{recursive:true});
+  // Preserve the exact archived recipe leaves without replacing the current
+  // Store's worker dependency graph. Only this isolated observer reads them.
+  installLegacyWorkerRecipeSourceFixture(legacy);
+  for(const name of ['peers/legacy-occupancy-plan.mjs','peers/legacy-worker-occupancy.mjs'])fs.copyFileSync(path.join(current,name),path.join(legacy,name));
+  // Re-export genuine current modules: Store class identity, policy capabilities
+  // and storage/ledger behavior remain shared, with no substitute guards.
+  for(const name of ['store.mjs','record-storage.mjs','peers/ledger.mjs','peers/legacy-occupancy-policy.mjs']){
+    fs.writeFileSync(path.join(legacy,name),`export * from ${JSON.stringify(pathToFileURL(path.join(current,name)).href)};\n`);
+  }
+  return legacy;
+}
 async function fixture(t,{missingBackend=false}={}){
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-FICTIONAL-occupancy-plan-')),runtimeCopy=path.join(root,'SOURCE-plugin/runtime'),company=path.join(root,'FICTIONAL-company');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-FICTIONAL-occupancy-plan-')),company=path.join(root,'FICTIONAL-company');
   let store;t.after(()=>{if(store&&!store.closed)store.close();fs.rmSync(root,{recursive:true,force:true});});
-  fs.mkdirSync(path.dirname(runtimeCopy));fs.cpSync(runtime,runtimeCopy,{recursive:true});installLegacyWorkerRecipeSourceFixture(runtimeCopy);const backendFile=path.join(runtimeCopy,'peers/origin-plan.mjs');if(missingBackend)fs.rmSync(backendFile,{force:true});else fs.writeFileSync(backendFile,companion);fs.mkdirSync(path.join(company,'.company'),{recursive:true});
+  const runtimeCopy=installOccupancyPlanSourceFixture(root),backendFile=path.join(runtimeCopy,'peers/origin-plan.mjs');if(missingBackend)fs.rmSync(backendFile,{force:true});else fs.writeFileSync(backendFile,companion);fs.mkdirSync(path.join(company,'.company'),{recursive:true});
   const load=relative=>import(pathToFileURL(path.join(runtimeCopy,relative)).href),[api,source,storage,storeModule,models,ledger]=await Promise.all(['peers/legacy-occupancy-plan.mjs','peers/legacy-occupancy-policy.mjs','record-storage.mjs','store.mjs','model-process-closure.mjs','peers/ledger.mjs'].map(load)),backend=missingBackend?null:await load('peers/origin-plan.mjs');
   const actor={host:'codex',native_id:'SYNTHETIC-founder',session_id:'SYNTHETIC-founder'},db=new DatabaseSync(path.join(company,'.company/company.sqlite'));
   db.exec("CREATE TABLE company(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT); CREATE TABLE events(seq INTEGER PRIMARY KEY,at TEXT,type TEXT,value TEXT); CREATE TABLE company_layout(id INTEGER PRIMARY KEY CHECK(id=1),version INTEGER NOT NULL); INSERT INTO company_layout VALUES(1,4); CREATE TABLE immutable_values(sha256 TEXT PRIMARY KEY,bytes TEXT NOT NULL); CREATE TABLE state_entries(family TEXT NOT NULL,key TEXT NOT NULL,position INTEGER NOT NULL,sha256 TEXT NOT NULL,encoding TEXT NOT NULL DEFAULT 'json',PRIMARY KEY(family,key));");
@@ -79,7 +94,7 @@ test('fixed original backend is absent in this source composition; shaped stores
 test('present fixed backend import preserves AggregateError identity despite missing-module code and canonical URL',async t=>{
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'soloco-SYNTHETIC-plan-import-')));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  const runtimeCopy=path.join(root,'runtime');fs.cpSync(runtime,runtimeCopy,{recursive:true});installLegacyWorkerRecipeSourceFixture(runtimeCopy);
+  const runtimeCopy=installOccupancyPlanSourceFixture(root);
   const backendFile=path.join(runtimeCopy,'peers/origin-plan.mjs'),key='SYNTHETIC-plan-import-'+path.basename(root),cause=Error('SYNTHETIC original cause'),member=Error('SYNTHETIC original member');
   const sentinel=Object.assign(new AggregateError([member],'SYNTHETIC present backend import failure',{cause}),{code:'ERR_MODULE_NOT_FOUND',url:pathToFileURL(backendFile).href});
   globalThis[key]=sentinel;t.after(()=>delete globalThis[key]);
