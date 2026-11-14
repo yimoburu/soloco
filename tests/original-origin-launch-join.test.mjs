@@ -53,7 +53,7 @@ test('an original Store snapshot loan expires and cannot become an origin launch
 });
 
 test('new origin purpose labels cannot supply missing original peer launch coverage or mint a cold claim',{concurrency:false},async t=>{
-  denyInventoryExternalEffects(t);const f=unqualifiedPeer(t),{producer}=await import('../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs'),before=logicalSQLState(f);
+  denyInventoryExternalEffects(t);const f=unqualifiedPeer(t),producer=await import('../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs'),before=logicalSQLState(f);
   for(const kind of ['peer-origin-reconstruction','peer-origin-review','peer-origin-frontier-seal-review','owner-handover-review']){
     assert.throws(()=>producer.assertOriginalPeerMaintenanceExecutionCapacityFrom(f.ledger,{stage:'reserve',kind,remaining:3,cardinality_known:true}),originalHold);
     assert.throws(()=>producer.assertOriginalPeerMaintenanceExecutionCapacityFrom(f.ledger,{stage:'existing',admission_ref:reference}),originalHold);
