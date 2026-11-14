@@ -456,6 +456,25 @@ export function recordOriginalWorkerAssignmentFrom(store,state,job){
   job.original_execution_assignment={protocol:ASSIGNMENT,origin_id:w.history.origin.origin_id,assignment_id:job.id,source_generation_sha256:w.history.origin.source_generation_sha256,unit:LEGACY_UNIT,launches:[]};approve(w,job);return job;
 }
 export function assertOriginalWorkerAssignmentFrom(store,state,job){const w=writeContext(store,state);need(w.history&&same(w.before.jobs[job.id],job),'ASSIGNMENT_CHANGED');validAssignment(job,w.history.origin);return originalFacts(w.history);}
+// Existing owner reconciliation consumes a factual never-started worker close.
+// The actual Store/history supplies it; job JSON and thrown errors cannot. This
+// does not close a born worker/model, undo failure/spend, or authorize another
+// attempt. The public owner/epoch check remains at the fixed engine entry.
+export function reconcileOriginalWorkerNoBirthClosureFrom(store,state,job_id){
+  const w=writeContext(store,state);
+  need(w.type==='job.process_closure_reconciled'&&w.history&&text(job_id),'WORKER_NO_BIRTH_CLOSURE_REQUIRED');
+  return check(w.loan,()=>{
+    const history=originalHistory(w.loan),job=state.jobs?.[job_id],original=history.jobs[job_id];
+    need(original&&job&&same(job,original)&&same(history,w.history)&&same({id:state.id,origin:state.original_execution_origin,jobs:state.jobs??{},upgrades:upgradeProjection(state)},{id:history.id,origin:history.origin,jobs:history.jobs,upgrades:history.upgrades}),'WORKER_NO_BIRTH_SOURCE_CHANGED');
+    const excluded=['started_at','worker_pid','execution_started_at','execution_deadline_at','termination_deadline_at','model_process_tracking','development_id','prototype_id','execution_provenance','artifact_id','model_evidence','execution_failure','rejected_output'];
+    need(['failed','cancelled','interrupted'].includes(job.status)&&!excluded.some(key=>own(job,key))&&!['development_test','development_preflight'].includes(job.kind),'WORKER_NO_BIRTH_CLOSURE_REQUIRED');
+    validAssignment(job,history.origin);
+    const launches=job.original_execution_assignment.launches,l=launches[0];
+    need(launches.length===1&&l.kind==='worker'&&l.birth===null&&l.closure?.never_started===true&&l.closure.pid===null,'WORKER_NO_BIRTH_CLOSURE_REQUIRED');
+    if(job.coordination_release?.termination_confirmed===true)return false;
+    job.coordination_release={termination_confirmed:true,reason:'worker_not_started',at:time()};return true;
+  });
+}
 export function prepareOriginalWorkerLaunchFrom(store,state,input){
   const w=writeContext(store,state);need(w.history&&closed(input,own(input??{},'invocation_id')?['job_id','kind','invocation_id']:['job_id','kind'])&&['worker','model','development'].includes(input.kind),'LAUNCH_INPUT');
   const job=state.jobs?.[input.job_id];need(job&&same(job.original_execution_assignment,w.before.jobs[input.job_id]?.original_execution_assignment),'ASSIGNMENT_CHANGED');validAssignment(job,w.history.origin);
