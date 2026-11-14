@@ -148,10 +148,10 @@ test('partition completeness, zero typed homes and genuine normalized intake rem
 });
 
 test('public discovery exposes only the closed new marker and keeps complete catalog transport bounded',()=>withoutExternal(()=>{
-  const tool=main.toolList.find(t=>t.name==='company_context');assert.deepEqual(tool.inputSchema.properties.frozen_intake.enum,['initial-v1']);assert.equal(scoped.FROZEN_INITIAL_INTAKE,'initial-v1');assert.equal(presentation.REPLY_MAX_BYTES,65536);
+  const tool=main.toolList.find(t=>t.name==='company_context');assert.deepEqual(tool.inputSchema.properties.frozen_intake.enum,['initial-v1']);assert.equal(scoped.FROZEN_INITIAL_INTAKE,'initial-v1');assert.equal(presentation.REPLY_MAX_BYTES,65536);assert.equal(presentation.CATALOG_MAX_BYTES,131072);
   for(const id of ['x'.repeat(256),'\\'.repeat(128),'é'.repeat(128),'😀'.repeat(64)])for(const maximum of [100000,1000000]){
     const tools=structuredClone(main.toolList);tools.find(t=>t.name==='company_develop').inputSchema.properties.max_bytes.maximum=maximum;
-    const wire=presentation.rpcReply(id,{tools})+'\n',decoded=JSON.parse(wire);assert(Buffer.byteLength(wire)<=65536);assert.equal(decoded.id,id);assert.deepEqual(decoded.result,{tools});
+    const body=presentation.toolCatalogReply(id,tools),wire=body+'\n',decoded=JSON.parse(wire);assert(Buffer.byteLength(body)<=presentation.CATALOG_MAX_BYTES);assert(Buffer.byteLength(wire)<=presentation.CATALOG_MAX_BYTES+1);assert.equal(decoded.id,id);assert.deepEqual(decoded.result,{tools});
   }
 }));
 

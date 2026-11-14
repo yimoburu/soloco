@@ -57,10 +57,56 @@ function failureEvidence(error) {
   return evidence;
 }
 
+// This stamp fences reuse of monitor DATA, not execution or process custody.
+// Keep copied physical identities only; no Store, transaction or fd survives a check.
+function workerMonitorStoreStamp(root) {
+  const resolved=fs.realpathSync(root);
+  const entry=(file,directory)=>{
+    const stat=fs.lstatSync(file,{bigint:true});
+    if(stat.isSymbolicLink()||!(directory?stat.isDirectory():stat.isFile()))throw Object.assign(Error('Worker monitor store incarnation unavailable'),{code:'ASSIGNMENT_INELIGIBLE'});
+    return [stat.dev.toString(),stat.ino.toString()];
+  };
+  return JSON.stringify([resolved,entry(resolved,true),entry(path.join(resolved,'.company'),true),entry(path.join(resolved,'.company','company.sqlite'),false)]);
+}
+function workerMonitorExpiry(bounds,at,message,code=null,nullable=false) {
+  if(nullable&&at===null)return;
+  const deadline=Date.parse(at);
+  if(!Number.isSafeInteger(deadline))throw Object.assign(Error(message),code===null?{}:{code});
+  bounds.push(Object.freeze({deadline_at_ms:deadline,message,code}));
+}
+function workerMonitorFacts(state,current,grantExpiry,developmentMaxBytes) {
+  const timing=jobTimeoutState(current,Date.now());
+  if(!['waiting','executing'].includes(timing.state))throw Object.assign(Error('Assignment timing requires inspection or has expired'),{code:'ROLE_TIMEOUT'});
+  const bounds=[];
+  workerMonitorExpiry(bounds,timing.deadline_at,'Assignment deadline reached',timing.phase==='execution'?'ROLE_TIMEOUT':'STARTUP_TIMEOUT');
+  const start=Date.parse(timing.phase==='execution'?(current.execution_started_at??current.started_at):current.started_at);
+  if(!Number.isSafeInteger(start))throw Object.assign(Error('Assignment timing requires inspection'),{code:'INVALID_EXECUTION_TIMING'});
+  if(Number.isFinite(grantExpiry))workerMonitorExpiry(bounds,new Date(grantExpiry).toISOString(),'Scoped authorization expired','SCOPE_EXPIRED');
+  if(current.specialist!==undefined){
+    // eligibility() has checked the exact profile/policy, their inputs, usage and revocations.
+    const profile=state.records[current.specialist.profile.id].specialist,policy=state.records[current.specialist.policy.id].specialist;
+    workerMonitorExpiry(bounds,profile.definition.expires_at,'Specialist Held: profile or policy expired/revoked');
+    workerMonitorExpiry(bounds,policy.policy.expires_at,'Specialist Held: profile or policy expired/revoked');
+  }
+  if(current.context_format===6){
+    const operating=operatingContext(state,{scope:current.context_scope??'*',job_id:current.id});
+    workerMonitorExpiry(bounds,operating.valid_until,'Operating state Held: wall-clock validity expired',null,true);
+    for(const home of operating.homes)workerMonitorExpiry(bounds,home.value.operating_record.expires_at,'Operating state Held: wall-clock validity expired',null,true);
+  }
+  if(state.records?.[current.review_of?.id]?.operating_plan){
+    operatingReviewContext(state,current);
+    workerMonitorExpiry(bounds,state.records[current.review_of.id].operating_plan.valid_until,'Operating state Held: wall-clock validity expired',null,true);
+  }
+  return Object.freeze({not_before_ms:start,execution_deadline_at:current.execution_deadline_at??null,
+    development_max_bytes:developmentMaxBytes,bounds:Object.freeze(bounds)});
+}
+
 export async function work(root, jobId, model = runModel) {
   const mechanical=withStore(root,store=>store.readSnapshot(()=>{const state=store.read();return isOriginMechanicalQaWorker(state,state.jobs?.[jobId]);}));
   if(mechanical)return workPeerOriginMechanicalQa(root,jobId,model);
-  let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastToken,lastCurrent,lastGrantExpiry,lastDevelopmentMaxBytes;
+  const monitorStoreStamp=workerMonitorStoreStamp(root);
+  let job, state, context, output, artifact, controller, monitor, claimed=false,spawned=false,invoked=false,lastGrantExpiry,lastDevelopmentMaxBytes;
+  let monitorCache=null,lastExecutionDeadline=null;
   const supplemental=[],handoverReads=[];
   let deliveryLedger,pendingDelivery,partitionDelivery,scopedStreamLedger;
   let pendingRecordReads=[];
@@ -93,21 +139,40 @@ export async function work(root, jobId, model = runModel) {
   };
   const check=()=>{
     if(controller.signal.aborted)return;
-    try {withStore(root,db=>{
-      const token=db.changeToken?.();
-      // Profile deadlines can expire without a database change.
-      if(job.specialist!==undefined){const live=db.read();assertSpecialistEligible(live,live.jobs[jobId]);}
-      // Operating validity can expire without any write/change token.
-      if(lastCurrent?.context_format===6)operatingContext(db.read(),{scope:lastCurrent.context_scope??'*',job_id:lastCurrent.id});
-      else if(state?.records?.[job?.review_of?.id]?.operating_plan)operatingReviewContext(db.read(),lastCurrent??job);
-      if(Number.isFinite(lastGrantExpiry)&&Date.now()>=lastGrantExpiry)throw Object.assign(new Error('Scoped authorization expired'),{code:'SCOPE_EXPIRED'});
+    try {
+      const sameStore=()=>{if(workerMonitorStoreStamp(root)!==monitorStoreStamp)throw Object.assign(Error('Worker monitor store incarnation changed'),{code:'ASSIGNMENT_INELIGIBLE'});};
+      sameStore(); // Before opening the selected Store, not just after a cache hit.
+      const observed=withStore(root,db=>{
+        if(workerMonitorStoreStamp(db.root)!==monitorStoreStamp)throw Object.assign(Error('Worker monitor root changed'),{code:'ASSIGNMENT_INELIGIBLE'});
+        const value=db.readSnapshot(()=>{
+          sameStore();
+          const token=db.changeToken?.(),known=Number.isSafeInteger(token)&&token>=0;
+          let facts;
+          if(known&&monitorCache?.token===token&&monitorCache.stamp===monitorStoreStamp)facts=monitorCache.facts;
+          else {
+            // A failed/unknown token or incomplete refresh never retains an older success.
+            monitorCache=null;lastExecutionDeadline=null;
+            const live=db.read(),current=eligibility(live);
+            facts=workerMonitorFacts(live,current,lastGrantExpiry,lastDevelopmentMaxBytes);
+          }
+          sameStore();
+          return {token,known,facts};
+        });
+        sameStore();return value;
+      });
+      sameStore();
       // This project file can change without a database revision. Do not let
       // token-based polling retain a budget that the host has just lowered.
-      if(lastDevelopmentMaxBytes!==undefined&&lastDevelopmentMaxBytes>developmentLimits(root).max_bytes)throw Object.assign(new Error('Configured development ceiling was lowered below this scope'),{code:'SCOPE_BUDGET_CHANGED'});
-      if(token===undefined||token!==lastToken){lastCurrent=eligibility(db.read());lastToken=token;}
-      else {const timing=jobTimeoutState(lastCurrent,Date.now());if(['inspection','overdue','terminating'].includes(timing.state))throw Object.assign(new Error('Assignment deadline reached'),{code:'ROLE_TIMEOUT'});}
-    });}
-    catch(error) {controller.abort(error);}
+      if(observed.facts.development_max_bytes!==undefined&&observed.facts.development_max_bytes>developmentLimits(root).max_bytes)throw Object.assign(new Error('Configured development ceiling was lowered below this scope'),{code:'SCOPE_BUDGET_CHANGED'});
+      sameStore();
+      // Sample AFTER physical/configuration reads and all potentially expensive validation.
+      const now=Date.now();
+      if(now<observed.facts.not_before_ms)throw Object.assign(Error('Current time precedes recorded assignment start'),{code:'INVALID_EXECUTION_TIMING'});
+      for(const bound of observed.facts.bounds)if(now>=bound.deadline_at_ms)throw Object.assign(Error(bound.message),bound.code===null?{}:{code:bound.code});
+      monitorCache=observed.known?Object.freeze({token:observed.token,stamp:monitorStoreStamp,facts:observed.facts}):null;
+      lastExecutionDeadline=observed.facts.execution_deadline_at;
+    }
+    catch(error) {monitorCache=null;lastExecutionDeadline=null;controller.abort(error);}
   };
   try {
     state=withStore(root,db=>db.transaction('job.started',s=>{
@@ -195,7 +260,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
       for(let round=0;frozenEvidence||context.stream||(repair?retentionPhase!=='done':round<=16);round++){
       let retentionEnvelope=null;
       if(repair){assertRetentionRepairCallBudget({native_calls:retentionCalls,history_rounds:retentionHistoryRounds,phase:retentionPhase});if(request.length>RETENTION_FRAME_CHARACTERS)throw Error('Complete retention initial/READ/final frame exceeds historical character bound');}
-      const remaining=lastCurrent?.execution_deadline_at?Math.min(timeout.timeout_ms,Date.parse(lastCurrent.execution_deadline_at)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
+      const remaining=lastExecutionDeadline?Math.min(timeout.timeout_ms,Date.parse(lastExecutionDeadline)-Date.now()):handoverDeadline?Math.min(timeout.timeout_ms,handoverDeadline-Date.now()):timeout.timeout_ms;
       if(remaining<1000)throw Error('Insufficient execution time for supplemental read');
       if(context.qualification&&Buffer.byteLength(request,'utf8')>(scopedContext(context)?scoped.SCOPED_LIMITS:context.qualification.limits).input_bytes)throw Error('Partition qualification request overflow; nothing was truncated');
       if(frozenEvidence&&request.length>200000)throw Error('Handover request exceeds 200000 characters; nothing was truncated');
@@ -547,6 +612,7 @@ ${job.output_contract==='operating-proposal-v1'?'For this operating proposal, th
     }));} catch(failure) {if(failure!==unowned)throw failure;}
   } finally {
     if(monitor!==undefined)clearInterval(monitor);
+    monitorCache=null;lastExecutionDeadline=null;
   }
 }
 if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) await work(process.argv[2],process.argv[3]);

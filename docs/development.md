@@ -122,9 +122,13 @@ Backup and restore destinations require exact canonical absolute spelling. Raw p
 
 ## Efficient retained development candidates
 
-The project may persist `{"max_bytes_ceiling": 400000}` in `.company/development.json`. This is a bounded regular UTF-8 JSON file (at most 4096 bytes), not a model-produced instruction or an authority grant. The only supported key is `max_bytes_ceiling`, a safe integer from 1,000 through 1,000,000. Missing configuration preserves the 100,000-byte default; malformed, extra-key, linked or oversized configuration fails closed. No installed-cache edits or external service are needed. Prototype limits are unchanged.
+The project may persist `{"max_bytes_ceiling": 400000}` in `.company/development.json`. Prefer the supported [development-budget controls](development-budget.md) when configuring it through the agent: `company_develop` exposes `budget_inspect`, `budget_propose`, `budget_apply`, `budget_restore` and observation-only `budget_reconcile`, plus `budget_preflight` for complete selected-file measurements. The controls require the actual Codex root caller/current managed hook and current owner/epoch, and support normalized layout 4 only. They do not migrate storage or fall back from peer storage.
+
+The file remains a bounded regular UTF-8 JSON configuration (at most 4096 bytes), not an authority grant. Its only supported key is `max_bytes_ceiling`, a safe integer from 1,000 through 1,000,000. Missing configuration preserves the 100,000-byte default; malformed, extra-key, linked or oversized configuration fails closed. No installed-cache edits or external service are needed. Prototype limits are unchanged.
 
 Capability output exposes the resolved ceiling, per-file limit, configuration source and implementation maximum. MCP `tools/list` resolves the attached working directory; `toolListFor(root)` supports explicit inspection, and each tool call separately resolves its actual `root`. A schema for company A cannot raise company B's effective budget. Restart/relist the MCP tool schema after changing configuration; runtime checks use current configuration even before rediscovery. Selected scope `max_bytes` is still explicit and immutable. Increasing configuration does not enlarge an existing grant; lowering it below that scope holds subsequent generation/run/acceptance and requests cancellation of active tests. Restore the prior ceiling or prepare a smaller newly authorized scope; no old limit is silently rewritten.
+
+Preflight reads only explicitly authorized source paths and includes every selected dependency and test in the same candidate composition used by development. With complete supplied output it reports exact source, output and reconstructed-candidate serialization, including UTF-8 and JSON framing; without output those future sizes stay unknown. A finite requested headroom informs a recommendation, never an automatic ceiling increase or scope authorization. Recorded instructions are attributable caller evidence, not software proof of a human decision. Config application uses durable intent, checked file replacement and retained outcomes; SQLite plus the external JSON file is not one atomic transaction. An interrupted outcome requires inspection and explicit factual reconciliation, never an automatic retry.
 
 Input source records count UTF-8 bytes of their serialized `{path,content,sha256}` array. Each source file is also individually limited to the selected scope budget. Generated output counts the serialized files or patches array. Reconstructed candidate bytes count the complete sorted `{path,content}` array, including unchanged selected sources. JSON names, escaping and UTF-8 multibyte sequences count. Each input/output/candidate measurement must fit the selected budget; errors report actual, permitted and excess bytes. Metadata such as narrative review text is not part of those arrays; transport admission separately bounds it.
 
@@ -233,8 +237,14 @@ work and load all pending notice pages and exact summaries. Hook delivery does
 not acknowledge or resolve a notice. Existing companies retain pinned role
 instructions; this transport update grants no substitute role behavior.
 
-Model text is limited to 30,000 UTF-8 bytes and complete JSON-RPC replies to
-65,536 bytes, including JSON escaping. Exact reads may return a shorter range;
+Company tool results retain a 30,000-byte UTF-8 model-text limit and a
+65,536-byte complete JSON-RPC body limit, including JSON escaping. Only the
+server-owned `tools/list` descriptor catalog uses a separate 131,072-byte
+JSON-RPC body limit; the terminating newline is separate. Both routes retain
+the 258-byte serialized request-ID bound. An oversized catalog returns a
+bounded JSON-RPC error without a partial catalog. These descriptor limits
+grant no additional authority or company-data capacity.
+Exact reads may return a shorter range;
 follow `next_offset` until complete. Upgrade inspection preserves candidate hash,
 epoch and measured workload, with exact instruction sources. Oversized mutation
 results preserve attributable receipts and retrieval handles: a large response

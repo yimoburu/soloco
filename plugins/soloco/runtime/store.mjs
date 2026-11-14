@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import {types} from 'node:util';
 import {normalizedLayout,readNormalized,writeNormalized,migrateNormalized,writeNormalizedSelection,flushSnapshots,readImmutable,appendNormalizedJournal,LATEST_LAYOUT,readNormalizedValue,readPublicIndex,readPublicRows,readPublicHandle,readPublicAlias,captureStorageMetadata,captureStorageBaseline,insertStorageEvent,readStorageIntake} from './record-storage.mjs';
 import {bindSnapshots,bindOperatingIntake} from './snapshot.mjs';
 import {bindPublicReader,PUBLIC_COLLECTIONS} from './state-projections.mjs';
@@ -44,8 +45,72 @@ function checkBeforeCommit(check,db,state){
   const result=check(db,state);
   if(result!==undefined){if(result&&typeof result.then==='function')Promise.resolve(result).catch(()=>{});throw Error('beforeCommit must complete synchronously without a return value');}
 }
+// SOURCE-only attachment. This is an original connection/storage fence, never
+// caller identity or permission. Ordinary two-argument Stores are unchanged.
+const attachedStores=new WeakMap();
+const attachmentError=(code,message=code)=>Object.assign(Error(message),{code});
+function checkAttached(store,transaction=false){
+  const attached=attachedStores.get(store);if(!attached)return;
+  if(attached.closed)throw attachmentError('STORE_CONNECTION_EXPIRED');
+  if(store.db!==attached.connection)throw attachmentError('STORE_CONNECTION_CHANGED');
+  if(transaction&&attached.connection.isTransaction!==true)throw attachmentError('STORE_CONNECTION_TRANSACTION');
+  const result=attached.guard();
+  if(result!==undefined){if(result&&typeof result.then==='function')Promise.resolve(result).catch(()=>{});throw attachmentError('STORE_CONNECTION_GUARD','connectionGuard must complete synchronously without a return value');}
+  if(transaction&&attached.connection.isTransaction!==true)throw attachmentError('STORE_CONNECTION_TRANSACTION');
+}
+function attachedOptions(options,create){
+  if(options===undefined)return null;
+  if(create||!options||typeof options!=='object'||types.isProxy(options)||Object.getPrototypeOf(options)!==Object.prototype)throw attachmentError('STORE_CONNECTION_INPUT');
+  const fields=Object.getOwnPropertyDescriptors(options),keys=Reflect.ownKeys(fields);
+  if(keys.length!==2||keys.some(k=>!['connection','connectionGuard'].includes(k)||!fields[k].enumerable||!Object.hasOwn(fields[k],'value')))throw attachmentError('STORE_CONNECTION_INPUT');
+  const connection=fields.connection?.value,guard=fields.connectionGuard?.value;
+  if(!connection||types.isProxy(connection)||Object.getPrototypeOf(connection)!==DatabaseSync.prototype||typeof guard!=='function')throw attachmentError('STORE_CONNECTION_INPUT');
+  return {connection,guard,closed:false};
+}
+function checkedAttachedLayout(db,file){
+  // The native prototype call also rejects an object merely cast to its shape.
+  const actual=DatabaseSync.prototype.prepare.call(db,'PRAGMA database_list').all().find(row=>row.name==='main');
+  if(!actual?.file||fs.realpathSync(actual.file)!==file)throw attachmentError('STORE_CONNECTION_PATH');
+  normalizedLayout(db);
+  const names=new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name));
+  if([...names].some(name=>name.startsWith('peer_'))||!['company','events','company_layout','immutable_values','state_entries'].every(name=>names.has(name)))throw attachmentError('STORE_CONNECTION_LAYOUT');
+  const rows=db.prepare('SELECT id,version FROM company_layout').all();
+  if(rows.length!==1||rows[0].id!==1||rows[0].version!==4)throw attachmentError('STORE_CONNECTION_LAYOUT');
+}
+function checkedAttachedWritable(store){
+  const db=attachedStores.get(store).connection;
+  let opened=false,failed=false,failure;const cleanup=[];
+  try{
+    checkAttached(store);
+    db.exec('SAVEPOINT soloco_attached_writability;');opened=true;
+    checkAttached(store,true);
+    // BEGIN IMMEDIATE alone does not establish native main writability. This
+    // real write statement requires it, while selecting no canonical rows.
+    db.exec('UPDATE main.company_layout SET version=version WHERE 0;');
+    checkAttached(store,true);
+  }catch(error){failed=true;failure=error;}
+  finally{
+    if(opened)for(const sql of ['ROLLBACK TO SAVEPOINT soloco_attached_writability;','RELEASE SAVEPOINT soloco_attached_writability;']){
+      try{db.exec(sql);}catch(error){cleanup.push(error);}
+    }
+    // Also handles a provider which opens the savepoint and then throws, or a
+    // failed RELEASE. The constructor refused any pre-existing transaction.
+    try{if(db.isTransaction)db.exec('ROLLBACK');}catch(error){cleanup.push(error);}
+  }
+  if(failed){if(cleanup.length)throw new AggregateError([failure,...cleanup],'Attached Store writability and cleanup failed',{cause:failure});throw failure;}
+  if(cleanup.length)throw cleanup.length===1?cleanup[0]:new AggregateError(cleanup,'Attached Store writability cleanup failed');
+  checkAttached(store);
+}
+function rollbackStore(store,error){
+  const attached=attachedStores.get(store);
+  if(!attached){store.db.exec('ROLLBACK');throw error;}
+  try{if(attached.connection.isTransaction)attached.connection.exec('ROLLBACK');}
+  catch(cleanup){throw new AggregateError([error,cleanup],'Attached Store operation and rollback failed',{cause:error});}
+  throw error;
+}
 export class Store {
-  constructor(root, create = false) {
+  constructor(root, create = false, options) {
+    const attached=attachedOptions(options,create);
     this.root = folder(root);
     this.dir = path.join(this.root, '.company');
     noLink(this.dir);
@@ -53,6 +118,17 @@ export class Store {
     if (!fs.existsSync(this.dir)) throw new Error('No company here yet; call company_open');
     const file = path.join(this.dir, 'company.sqlite');
     for (const suffix of ['', '-wal', '-shm']) noLink(file + suffix);
+    if(attached){
+      this.db=attached.connection;this.inTransaction=false;
+      attachedStores.set(this,attached);
+      try{
+        checkAttached(this);
+        if(this.db.isTransaction)throw attachmentError('STORE_CONNECTION_TRANSACTION');
+        this.db.exec('PRAGMA busy_timeout=5000;');
+        checkedAttachedLayout(this.db,file);checkedAttachedWritable(this);
+        return;
+      }catch(error){attachedStores.delete(this);throw error;}
+    }
     this.db = new DatabaseSync(file);
     this.inTransaction=false;
     try {
@@ -66,7 +142,7 @@ export class Store {
       this.db.exec('CREATE TABLE IF NOT EXISTS company (id INTEGER PRIMARY KEY CHECK(id=1), value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, at TEXT NOT NULL, type TEXT NOT NULL, value TEXT NOT NULL);');
     }catch(error){this.db.close();throw error;}
   }
-  changeToken() { return this.db.prepare('SELECT COALESCE(MAX(seq),0) AS version FROM events').get().version; }
+  changeToken() { checkAttached(this);return this.db.prepare('SELECT COALESCE(MAX(seq),0) AS version FROM events').get().version; }
   captureIntakeBaseline() {return this.readSnapshot(()=>captureStorageBaseline(this.db));}
   // Exact row/event verification only. Checkpoint callers must resolve accepted
   // old/new envelopes against their frozen version map and validate snapshot
@@ -74,25 +150,32 @@ export class Store {
   // against the bound vault before review/publication/use; missing originals hold.
   readIntake(baseline,options) {return this.readSnapshot(()=>readStorageIntake(this.db,baseline,options));}
   storageInfo() {
+    checkAttached(this);
     const normalized=normalizedLayout(this.db),sentinel=normalized?JSON.parse(this.db.prepare('SELECT value FROM company WHERE id=1').get().value):null;
     return {format:normalized?'normalized-v'+this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version:'legacy-json',migration_required:!normalized||this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version<LATEST_LAYOUT,
       ...(sentinel?.source_state_sha256?{retained_source_state:{sha256:sentinel.source_state_sha256,characters:sentinel.source_state_characters}}:{})};
   }
-  migrate() { return migrateNormalized(this.db,this.dir); }
+  migrate() { if(attachedStores.has(this))throw attachmentError('STORE_ATTACHED_OPERATION_UNSUPPORTED');return migrateNormalized(this.db,this.dir); }
   readSnapshot(fn) {
-    if(this.inTransaction)return fn();
+    checkAttached(this);
+    if(this.inTransaction){const value=fn();checkAttached(this,true);return value;}
     this.db.exec('BEGIN');this.inTransaction=true;
-    try {const value=fn();this.db.exec('COMMIT');return value;}
-    catch(error){this.db.exec('ROLLBACK');throw error;}
+    try {const value=fn();checkAttached(this,true);this.db.exec('COMMIT');return value;}
+    catch(error){rollbackStore(this,error);}
     finally {this.inTransaction=false;}
   }
   snapshotState(state) {
+    checkAttached(this);
     const file=path.join(this.dir,'company.sqlite');
     const bound=bindSnapshots(state,sha=>{
+      if(attachedStores.has(this)){checkAttached(this);const value=readImmutable(this.db,sha);checkAttached(this);return value;}
       const reader=new DatabaseSync(file,{readOnly:true});
       try{return readImmutable(reader,sha);}finally{reader.close();}
     },file);
-    if(bound&&this.storageInfo().format==='normalized-v4')bindOperatingIntake(bound,this,()=>new Store(this.root));
+    if(bound&&this.storageInfo().format==='normalized-v4')bindOperatingIntake(bound,this,()=>{
+      if(attachedStores.has(this))throw attachmentError('STORE_ATTACHED_OPERATION_UNSUPPORTED');
+      return new Store(this.root);
+    });
     return bound;
   }
   readSelected(options) { return this.readSnapshot(()=>normalizedLayout(this.db)?this.snapshotState(readNormalized(this.db,options)):this.read()); }
@@ -101,11 +184,13 @@ export class Store {
   // No canonical-state hydration or broad key validation is needed for previews;
   // delivered values still pass the ordinary immutable hash/encoding checks.
   publicState(current=false) {
+    checkAttached(this);
     const catalog=readPublicIndex(this.db);
     if(!catalog)return this.read();
     const state=this.snapshotState(readNormalized(this.db,{rootKeys:current?['id','name','idea','revision','phase','mode','paused','plugin_version','runtime_version','governance_sha256','team_sha256','owner','handover','upgrade','governance','cos_instructions','roles']:[],entities:current?{upgrade:null}:{},validateKeys:false}));
     const cache=new Map(Object.entries(state).map(([key,value])=>[JSON.stringify(key==='upgrade'?['upgrade',null]:['root',key]),value]));
     const rows=(collection,offset,limit)=>{
+      checkAttached(this);
       const selected=readPublicRows(this.db,collection,offset,limit);
       if(selected.length!==Math.min(limit,catalog.collections[collection].total-offset))throw Error('Public read index rows missing');
       const pointers=selected.map(row=>{
@@ -127,18 +212,21 @@ export class Store {
         const loaded=this.snapshotState(readNormalized(this.db,{rootKeys,entities,validateKeys:false}));
         for(const {family,key,identity} of missing)cache.set(identity,family==='root'?loaded[key]:key===null?loaded[family]:loaded[family]?.[key]);
       }
-      return pointers.map(({row,identity})=>{
+      const values=pointers.map(({row,identity})=>{
         const value=cache.get(identity);
         if(value===undefined)throw Error('Missing or changed public index source');
         return {...row,value};
       });
+      checkAttached(this);return values;
     };
     return bindPublicReader(state,{...catalog,info:collection=>{
+      checkAttached(this);
       if(!PUBLIC_COLLECTIONS.includes(collection))throw Error('Unknown public collection');
       return catalog.collections[collection];
     },rows});
   }
   publicReconciliationState(includeExports=true) {
+    checkAttached(this);
     const catalog=readPublicIndex(this.db);
     if(!catalog)return null;
     const keys=collection=>{
@@ -148,13 +236,14 @@ export class Store {
     };
     return this.snapshotState(readNormalized(this.db,{rootKeys:[],entities:{jobs:keys('active_jobs'),...(includeExports?{records:keys('_exports')}:{}),upgrade:['status','review_deadline_policy','deadline_ms','review_window_minutes','created_at']},validateKeys:false}));
   }
-  publicHandle(collection,keyHash) {return readPublicIndex(this.db)?readPublicHandle(this.db,collection,keyHash):null;}
-  publicAlias(collection,id) {return readPublicIndex(this.db)?readPublicAlias(this.db,collection,id):undefined;}
+  publicHandle(collection,keyHash) {checkAttached(this);return readPublicIndex(this.db)?readPublicHandle(this.db,collection,keyHash):null;}
+  publicAlias(collection,id) {checkAttached(this);return readPublicIndex(this.db)?readPublicAlias(this.db,collection,id):undefined;}
   readPublicSelected(options) {return this.readSnapshot(()=>readPublicIndex(this.db)?this.snapshotState(readNormalized(this.db,{...options,validateKeys:false})):this.readSelected(options));}
   // Native output is an append-only fact, including late returns. This path
   // reads the current attempt identity and journal metadata, never old reports
   // or company records. Historical/legacy attempts use the ordinary fallback.
   appendUpgradeCall(uid,entry) {
+    if(attachedStores.has(this))throw attachmentError('STORE_ATTACHED_OPERATION_UNSUPPORTED');
     if(!normalizedLayout(this.db)||this.db.prepare('SELECT version FROM company_layout WHERE id=1').get().version<3)return false;
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
@@ -171,12 +260,14 @@ export class Store {
     finally{this.inTransaction=false;}
   }
   selectedTransaction(type,options,fn,{afterWrite,beforeCommit}={}) {
+    checkAttached(this);
     if(!normalizedLayout(this.db))return this.transaction(type,s=>fn(s),{afterWrite,beforeCommit});
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
       const metadata=captureStorageMetadata(this.db);
       const state=this.snapshotState(readNormalized(this.db,options)),before=JSON.stringify(state);
       const result=fn(state);
+      checkAttached(this,true);
       state.revision=(state.revision??0)+1;state.updated_at=stamp();
       const changes=[];const old=JSON.parse(before);
       for(const key of new Set([...Object.keys(old),...Object.keys(state)])) {const value=state[key];
@@ -187,10 +278,12 @@ export class Store {
       flushSnapshots(this.db,state);
       writeNormalizedSelection(this.db,changes);
       if(afterWrite)afterWrite(this.db,state);
+      checkAttached(this,true);
       insertStorageEvent(this.db,type,{revision:state.revision,owner:state.owner},metadata);
       checkBeforeCommit(beforeCommit,this.db,state);
+      checkAttached(this,true);
       this.db.exec('COMMIT');this.snapshotState(state);return result;
-    }catch(error){this.db.exec('ROLLBACK');throw error;}
+    }catch(error){rollbackStore(this,error);}
     finally {this.inTransaction=false;}
   }
   read() {
@@ -201,25 +294,29 @@ export class Store {
     });
   }
   transaction(type, fn, {afterWrite,beforeCommit}={}) {
+    checkAttached(this);
     this.db.exec('BEGIN IMMEDIATE');this.inTransaction=true;
     try {
       const metadata=normalizedLayout(this.db)?captureStorageMetadata(this.db):null;
       const state = this.read();
       const next = fn(state);
+      checkAttached(this,true);
       next.revision = (state?.revision ?? -1) + 1;
       next.updated_at = stamp();
       flushSnapshots(this.db,state,next);
       if(normalizedLayout(this.db))writeNormalized(this.db,next);
       else this.db.prepare('INSERT INTO company VALUES (1,?) ON CONFLICT(id) DO UPDATE SET value=excluded.value').run(JSON.stringify(next));
       if(afterWrite)afterWrite(this.db,next);
+      checkAttached(this,true);
       insertStorageEvent(this.db,type,{revision:next.revision,owner:next.owner},metadata);
       checkBeforeCommit(beforeCommit,this.db,next);
+      checkAttached(this,true);
       this.db.exec('COMMIT');
       return this.snapshotState(next);
-    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+    } catch (error) { rollbackStore(this,error); }
     finally {this.inTransaction=false;}
   }
-  close() { this.closed=true;this.db.close(); }
+  close() { const attached=attachedStores.get(this);if(attached)attached.closed=true;this.closed=true;if(!attached)this.db.close(); }
 }
 export function withStore(root, fn, create = false) {
   const db = new Store(root, create);
