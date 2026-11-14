@@ -13,8 +13,15 @@ import {
 // uses a native AbortSignal. No child process, CLI discovery, real timer,
 // network, account access or paid model invocation is needed.
 class Clock {
-  constructor() {this.time=1000000; this.next=1; this.timers=new Map();}
-  now=()=>this.time;
+  constructor(start) {
+    this.time=start===undefined?1000000:start;
+    // Keep deterministic logical positions while giving Original admission a
+    // current wall epoch. Explicit absolute/overflow clocks stay unchanged.
+    this.offset=start===undefined?Date.now()-this.time:0;
+    this.next=1;this.timers=new Map();
+  }
+  timestamp=at=>this.offset+at;
+  now=()=>this.timestamp(this.time);
   set=(fn, delay)=>{
     assert.ok(Number.isFinite(delay) && delay>=0);
     const id=this.next++;
@@ -69,8 +76,7 @@ class Child extends EventEmitter {
 }
 const codexOutput = text => JSON.stringify({type:'thread.started',thread_id:'native-fictional'})+'\n'+JSON.stringify({type:'turn.started'})+'\n'+JSON.stringify({type:'item.completed',item:{type:'agent_message',text}})+'\n'+JSON.stringify({type:'turn.completed'})+'\n';
 function harness({child=new Child(), signal=trackedAbortSignal(), onSpawn, timeout=1000, timeoutReason='Small deterministic fixture', host='codex', nativeId=null, selection=null, spawnHook, resolveHook, timeoutContext, clockStart, executionDeadlineAt}={}) {
-  const clock=new Clock();
-  if(clockStart!==undefined)clock.time=clockStart;
+  const clock=new Clock(clockStart);
   const calls=[];
   const receipts=[];
   let resolves=0;
@@ -199,8 +205,8 @@ test('normal completion starts allowance at spawn and preserves isolation and se
   assert.equal(h.receipts.length,0);
   h.child.emit('spawn');
   assert.equal(h.receipts.length,1);
-  assert.equal(Date.parse(h.receipts[0].execution_started_at),1239999);
-  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),1240999);
+  assert.equal(Date.parse(h.receipts[0].execution_started_at),h.clock.timestamp(1239999));
+  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),h.clock.timestamp(1240999));
   assert.deepEqual(h.calls[0][1],commandArgs('codex','native-fictional',selection));
   assert.equal(h.calls[0][2].env.COMPANY_WORKER,'1');
   assert.equal(Object.hasOwn(h.calls[0][2].env,'CLAUDECODE'),false);
@@ -518,9 +524,9 @@ test('internal upgrade context wires a 30-minute spawn receipt and real executio
   h.child.emit('spawn');
   assert.equal(h.receipts.length,1);
   assert.equal(h.receipts[0].timeout_ms,1800000);
-  assert.equal(Date.parse(h.receipts[0].execution_started_at),1100000);
-  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),2900000);
-  assert.equal(Date.parse(h.receipts[0].termination_deadline_at),2903000);
+  assert.equal(Date.parse(h.receipts[0].execution_started_at),h.clock.timestamp(1100000));
+  assert.equal(Date.parse(h.receipts[0].execution_deadline_at),h.clock.timestamp(2900000));
+  assert.equal(Date.parse(h.receipts[0].termination_deadline_at),h.clock.timestamp(2903000));
   assert.deepEqual([...h.clock.timers.values()].map(t=>t.at),[2900000]);
   h.clock.move(2899999);
   assert.deepEqual(h.child.signals,[]);
