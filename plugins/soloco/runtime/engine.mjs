@@ -41,7 +41,13 @@ import {readTaskState,updateTaskIndex} from './task-index.mjs';
 import {specialistAction,isSpecialistRecord,prepareSpecialistAssignment,specialistSessionKey,specialistContext,usesSpecialistInputRevisions} from './specialists.mjs';
 import * as originMechanicalQa from './peers/origin-mechanical-qa-policy.mjs';
 import {qaData,qaRef,qaNeed,qaText,qaSame,qaCopy} from './peers/origin-mechanical-qa-contract.mjs';
-import {recordOriginalWorkerAssignmentFrom,prepareOriginalWorkerLaunchFrom,spawnOriginalWorkerLaunch,cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {recordOriginalWorkerAssignmentFrom,cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {recordRuntimeWorkerAssignmentFrom,prepareRuntimeWorkerLaunchFrom,spawnRuntimeWorkerLaunch,cleanupLegacyRuntimeLaunchFailure,runtimeJobOccupied} from './runtime-execution.mjs';
+
+function cleanupRuntimeWorkerLaunchFailure(error){
+  const legacy=cleanupLegacyRuntimeLaunchFailure(error),original=cleanupOriginalWorkerLaunchFailure(error);
+  return legacy||original;
+}
 
 const busy = state => Object.values(state.jobs??{}).filter(j => ['queued','running'].includes(j?.status));
 const originalEngineCommitCutoffs=new WeakMap();
@@ -58,7 +64,7 @@ function retainEngineCommitCutoff(actualDb,bounds){
   originalEngineCommitCutoffs.set(proof,{db:loan.db,scope:loan.scope,facts});retainOriginalStoreCommitCutoffFrom(actualDb,proof,'engine');
 }
 // Terminal status does not prove that a started model process has closed.
-const occupiedJobs = state => Object.values(state.jobs??{}).filter(j=>['queued','running'].includes(j.status)||(j.runtime_task||j.started_at)&&['cancelled','interrupted','failed'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true);
+const occupiedJobs = state => Object.values(state.jobs??{}).filter(j=>runtimeJobOccupied(j)||['queued','running'].includes(j.status)||(j.runtime_task||j.started_at)&&['cancelled','interrupted','failed'].includes(j.status)&&j.coordination_release?.termination_confirmed!==true);
 export function bind(root, session, host) {
   requireText(session,'session_id',200);
   const dir = path.join(dataDir(),'bindings');
@@ -464,7 +470,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     if(specialist)job.specialist=specialist.binding;
     if(args.output_contract!==undefined){if(args.output_contract!=='operating-proposal-v1'||job.context_format!==6)throw Error('Operating proposal contract requires an ordinary accepted-checkpoint assignment');job.output_contract=args.output_contract;}
     if(fresh)Object.assign(job,{fresh_session:true,fresh_session_reason:freshReason});
-    recordOriginalWorkerAssignmentFrom(store,s,job);
+    recordRuntimeWorkerAssignmentFrom(store,s,job);
     s.sessions[key]=session;
     // Dependencies add explicit data after initial admission. Check that final
     // explicit set before context assembly adds mandatory governing evidence.
@@ -501,7 +507,7 @@ export function dispatch(args,host,{launch=launchWorker,check=readiness,catalog=
     const worker=launch(args.root,jobId);
     worker.on('error',error=>withStore(args.root,db=>db.transaction('job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:false,reason:'worker_spawn_failed_unverified',at:stamp()};notice(s,'must_know','Unable to start specialist session.',jobId);return s;})));
     worker.unref();
-  } catch(error) {const escaped=cleanupOriginalWorkerLaunchFailure(error);try{update(args,host,'job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:false,reason:'worker_not_started_unverified',at:stamp()};});}catch(failure){if(!escaped)throw failure;}throw error;}
+  } catch(error) {const escaped=cleanupRuntimeWorkerLaunchFailure(error);try{update(args,host,'job.spawn_failed',s=>{s.jobs[jobId].status='failed';s.jobs[jobId].error=error.message;s.jobs[jobId].coordination_release={termination_confirmed:false,reason:'worker_not_started_unverified',at:stamp()};});}catch(failure){if(!escaped)throw failure;}throw error;}
   return mutationView(state.jobs[jobId],'job:'+jobId,'jobs');
 }
 // Trusted engine join ONLY. Public callers provide closed DATA; neither an
@@ -542,10 +548,10 @@ function launchWorker(root,jobId){try{return withStore(root,store=>{
       const window=proposal.code_review_window_minutes*60000;if(!Number.isSafeInteger(window)||window<=0)throw Error('Invalid retained continuation review window');
       bounds.push({at:Date.parse(proposal.expires_at)-window+1,code:'SCOPE_WINDOW_UNAVAILABLE',message:'Insufficient authorized time for the complete fixed code review window'});
     }
-    retainEngineCommitCutoff(store.db,bounds);launch=prepareOriginalWorkerLaunchFrom(store,s,{job_id:jobId,kind:'worker'});return s;
+    retainEngineCommitCutoff(store.db,bounds);launch=prepareRuntimeWorkerLaunchFrom(store,s,{job_id:jobId,kind:'worker'});return s;
   });
-  return spawnOriginalWorkerLaunch(launch,process.execPath,['--no-warnings',path.join(PACKAGE,'runtime/worker.mjs'),folder(root),jobId],{detached:true,stdio:'ignore',env:{...process.env,COMPANY_WORKER:'1'}});
-});}catch(error){cleanupOriginalWorkerLaunchFailure(error);throw error;}}
+  return spawnRuntimeWorkerLaunch(launch);
+});}catch(error){cleanupLegacyRuntimeLaunchFailure(error);cleanupOriginalWorkerLaunchFailure(error);throw error;}}
 // Internal runtime principal. No owner session is substituted into the public
 // dispatch API: the exact canonical task and current runtime grant authorize
 // this one queue transition, atomically with its attempt binding.
@@ -579,7 +585,7 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
       timeout_policy_version:TIMEOUT_POLICY_VERSION,...timeout,model_selection:selection,cli_version:readyHost.version??null,task_summary:spec.expected_deliverable,next_handoff:'Runtime validates the exact result and wakes eligible dependent tasks',created_at:stamp(),
       ...(inventory?{model_catalog:{source:inventory.source,model:inventory.models.find(m=>m.id===selection.model),speed_support:inventory.speed_support}}:{})};
     if(specialist)job.specialist=specialist.binding;
-    recordOriginalWorkerAssignmentFrom(db,s,job);
+    recordRuntimeWorkerAssignmentFrom(db,s,job);
     s.sessions[sessionKey]={instance_id:instance,role:spec.role,native_id:null,host,model_selection:selection,...(specialist?{specialist:specialist.binding}:{})};
     if(specialist)prepareSpecialistAssignment(s,{...spec,input_ids:ready.input_ids});
     const context=assignmentContext(s,job);job.inputs=context.inputs;job.context_sha256=context.hash;
@@ -591,7 +597,7 @@ export function queueRuntimeTask(root,taskId,{launch=launchWorker,check=readines
     return s;
   },{afterWrite:updateTaskIndex}));
   try{const child=launch(root,jobId);child.on('error',error=>withStore(root,db=>db.transaction('task.spawn_failed',s=>{const j=s.jobs[jobId];if(j?.status==='queued'){j.status='failed';j.error=error.message;j.coordination_release={termination_confirmed:false,reason:'worker_spawn_failed_unverified',at:stamp()};}return s;})));child.unref();}
-  catch(error){const escaped=cleanupOriginalWorkerLaunchFailure(error);try{withStore(root,db=>db.transaction('task.spawn_failed',s=>{const j=s.jobs[jobId];j.status='failed';j.error=error.message;j.coordination_release={termination_confirmed:false,reason:'worker_not_started_unverified',at:stamp()};return s;}));}catch(failure){if(!escaped)throw failure;}throw error;}
+  catch(error){const escaped=cleanupRuntimeWorkerLaunchFailure(error);try{withStore(root,db=>db.transaction('task.spawn_failed',s=>{const j=s.jobs[jobId];j.status='failed';j.error=error.message;j.coordination_release={termination_confirmed:false,reason:'worker_not_started_unverified',at:stamp()};return s;}));}catch(failure){if(!escaped)throw failure;}throw error;}
   return {task_id:taskId,job_id:jobId,instance_id:instance,status:result.jobs[jobId].status,native_id:null,native_identity:'not_observed_until_native_return'};
 }
 export function control(args,host) {

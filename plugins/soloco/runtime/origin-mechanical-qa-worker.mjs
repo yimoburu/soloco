@@ -3,9 +3,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {prepareOriginalWorkerLaunchFrom,cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
-import {withStore,stamp,id,noLink,compatibleRuntime,upgradePending} from './store.mjs';
-import {runModel} from './adapters.mjs';
+import {prepareOriginalWorkerLaunchFrom,cleanupOriginalWorkerLaunchFailure,assertOriginalOrdinaryModelObservedFrom,assertOriginalOrdinaryModelBirthObservedFrom,assertOriginalOrdinaryModelClosureObservedFrom} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {Store,withStore,stamp,id,noLink,compatibleRuntime,upgradePending} from './store.mjs';
+import {runModel,assertRuntimeAdapterModelBirthFrom,assertRuntimeAdapterModelClosureFrom} from './adapters.mjs';
 import {executionTiming,jobTimeoutState} from './timeout.mjs';
 import {requestModelProcess,recordModelProcessBirth,recordModelProcessClosure,reconcileStoredModelProcessClosure,validModelProcessTracking} from './model-process-closure.mjs';
 import * as qa from './peers/origin-mechanical-qa-policy.mjs';
@@ -33,7 +33,7 @@ function parseReview(raw,plan){
 }
 
 export async function workPeerOriginMechanicalQa(root,jobId,model=runModel){
- let original,context,job,plan,claimed=false,invoked=false,output,birth=null,closure=null,invocation,monitor,controller=new AbortController(),callTiming;
+ let original,context,job,plan,claimed=false,invoked=false,output,birth=null,closure=null,invocation,monitor,controller=new AbortController(),callTiming,physicalCallClosed=false;
  let excluded;
  const source=(store,state,{running=true,pending=false,terminal=false}={})=>{
   const current=state.jobs?.[jobId];need(isOriginMechanicalQaTarget(state,current),'ORIGIN_MECHANICAL_QA_ACTUAL_PLAN_REQUIRED');
@@ -71,24 +71,30 @@ export async function workPeerOriginMechanicalQa(root,jobId,model=runModel){
   const gate=()=>{if(controller.signal.aborted)throw controller.signal.reason;const r=inspect({pending:true});clock(Math.min(r.proof.deadline_at_ms,callDeadline));return r;};
   const before=gate(),remaining=before.proof.limits.timeout_ms;need(Date.now()+remaining<callDeadline,'ORIGIN_MECHANICAL_QA_COMPLETE_TIMEOUT_WINDOW_REQUIRED');
   invoked=true;
-  output=await withStore(root,store=>{
-   let launch;store.transaction('job.model_process.launch_requested',state=>{source(store,state,{pending:true});launch=prepareOriginalWorkerLaunchFrom(store,state,{job_id:jobId,kind:'model',invocation_id:invocation.invocation_id});return state;},{beforeCommit:(_db,next)=>positiveCommit(store,next)});
-   return model(job.host,null,prompt,directory,remaining,job.model_selection,{
+  const callStore=new Store(root);let launch;
+  try{
+   callStore.transaction('job.model_process.launch_requested',state=>{source(callStore,state,{pending:true});launch=prepareOriginalWorkerLaunchFrom(callStore,state,{job_id:jobId,kind:'model',invocation_id:invocation.invocation_id});return state;},{beforeCommit:(_db,next)=>positiveCommit(callStore,next)});
+   output=await model(job.host,null,prompt,directory,remaining,job.model_selection,{
    originalExecutionLaunch:launch,
    signal:controller.signal,timeoutReason:job.timeout_reason,maxOutputCharacters:100000,executionDeadlineAt:callDeadline,
-   // runModel's public onSpawn occurs AFTER spawn. Its existing private spawn
-   // seam places the fixed original admission check AFTER executable/provider
+   // runModel's public onSpawn occurs AFTER spawn. Its private launch gate
+   // places the fixed original admission check AFTER executable/provider
    // resolution and BEFORE the actual child is created. No caller chooses it.
    beforeOriginalSpawn:()=>{gate();need(Date.now()+remaining<callDeadline,'ORIGIN_MECHANICAL_QA_COMPLETE_TIMEOUT_WINDOW_REQUIRED');},
-   onModelProcess:value=>{need(!birth,'ORIGIN_MECHANICAL_QA_BIRTH_CHANGED');withStore(root,store=>store.transaction('job.model_process.born',s=>{recordModelProcessBirth(owned(s),invocation,value);return s;}));birth=copy(value);},
-   onModelClosure:(value,receipt)=>{need(birth&&same(value,birth)&&!closure,'ORIGIN_MECHANICAL_QA_CLOSURE_CHANGED');withStore(root,store=>store.transaction('job.model_process.closed',s=>{recordModelProcessClosure(owned(s),invocation,value,receipt);return s;}));closure=copy(receipt);
+   onModelProcess:value=>{assertRuntimeAdapterModelBirthFrom(launch,value);assertOriginalOrdinaryModelBirthObservedFrom(launch,value);need(!birth,'ORIGIN_MECHANICAL_QA_BIRTH_CHANGED');withStore(root,store=>store.transaction('job.model_process.born',s=>{recordModelProcessBirth(owned(s),invocation,value);return s;}));birth=copy(value);},
+   onModelClosure:(value,receipt)=>{assertRuntimeAdapterModelClosureFrom(launch,value,receipt);assertOriginalOrdinaryModelClosureObservedFrom(launch,value,receipt);need(birth&&same(value,birth)&&!closure,'ORIGIN_MECHANICAL_QA_CLOSURE_CHANGED');withStore(root,store=>store.transaction('job.model_process.closed',s=>{recordModelProcessClosure(owned(s),invocation,value,receipt);return s;}));closure=copy(receipt);
     // Original child close may arrive AFTER rejection/timeout. Receipt first,
     // then the unchanged canonical request/birth/close reconciler for ONLY
     // this new original job. This is observation, never positive permission.
     withStore(root,store=>{const current=store.read().jobs[jobId];if(!['failed','cancelled','interrupted'].includes(current?.status))return;store.transaction('job.process_closure_reconciled',s=>{reconcileStoredModelProcessClosure(store,owned(s));return s;});});
    },
    onSpawn:timing=>{need(!callTiming&&birth,'ORIGIN_MECHANICAL_QA_TIMING_CHANGED');const start=Date.parse(timing?.execution_started_at),recorded=executionTiming(start,{timeout_ms:remaining,timeout_reason:job.timeout_reason});need(start>=Date.parse(invocation.requested_at)&&start<=Date.now()&&same(timing,recorded),'ORIGIN_MECHANICAL_QA_TIMING_CHANGED');positiveWrite('job.execution_started',(_s,{current})=>{need(!current.execution_started_at,'ORIGIN_MECHANICAL_QA_TIMING_CHANGED');current.execution_started_at=timing.execution_started_at;current.execution_deadline_at=timing.execution_deadline_at;current.termination_deadline_at=timing.termination_deadline_at;});callTiming=copy(timing);}
-  });});
+  });
+   assertOriginalOrdinaryModelObservedFrom(launch,birth,closure);physicalCallClosed=true;
+  }finally{
+   try{if(launch){assertOriginalOrdinaryModelObservedFrom(launch,birth,closure);physicalCallClosed=true;}}catch{/* retained UNKNOWN cannot become success */}
+   callStore.close();
+  }
   check();if(controller.signal.aborted)throw controller.signal.reason;inspect({pending:true});
   need(birth&&closure&&closure.exit_code===0&&closure.signal===null&&callTiming&&Date.now()<Date.parse(callTiming.execution_deadline_at)&&text(output?.native_id,300)&&!excluded.has(output.native_id),'ORIGIN_MECHANICAL_QA_ORIGINAL_CLOSURE_REQUIRED');
   const artifact=parseReview(output.text,plan),artifactId=id('artifact');
@@ -104,6 +110,6 @@ export async function workPeerOriginMechanicalQa(root,jobId,model=runModel){
   // No admission/claim means NO writes at all. Otherwise retain only this
   // original worker's negative evidence, even after expiry/owner loss. No new
   // purpose, global release, retry, reviewer acceptance or old unit mutation.
-  try{if(claimed)withStore(root,store=>store.transaction('job.failed',state=>{const current=owned(state),rejected=output??error.rejected_output;current.status='failed';current.finished_at=stamp();current.error=String(error.message??error).slice(0,1000);current.execution_failure={code:typeof error.code==='string'?error.code:'ORIGIN_MECHANICAL_QA_WORKER_FAILED',message:current.error,outcome:'failure',at:stamp()};current.coordination_release={termination_confirmed:!invoked||Boolean(birth&&closure),reason:!invoked?'model_not_invoked':birth&&closure?'model_process_closed':'original_process_closure_unknown',at:stamp()};if(rejected&&typeof rejected.text==='string')current.rejected_output={text:rejected.text,context_sha256:context.sha256,accepted:false,...(typeof rejected.native_id==='string'?{native_id:rejected.native_id}:{})};return state;}));}catch(failure){if(!escaped)throw failure;}throw error;
+  try{if(claimed)withStore(root,store=>store.transaction('job.failed',state=>{const current=owned(state),rejected=output??error.rejected_output;current.status='failed';current.finished_at=stamp();current.error=String(error.message??error).slice(0,1000);current.execution_failure={code:typeof error.code==='string'?error.code:'ORIGIN_MECHANICAL_QA_WORKER_FAILED',message:current.error,outcome:'failure',at:stamp()};current.coordination_release={termination_confirmed:!invoked||physicalCallClosed,reason:!invoked?'model_not_invoked':physicalCallClosed?'model_process_closed':'original_process_closure_unknown',at:stamp()};if(rejected&&typeof rejected.text==='string')current.rejected_output={text:rejected.text,context_sha256:context.sha256,accepted:false,...(typeof rejected.native_id==='string'?{native_id:rejected.native_id}:{})};return state;}));}catch(failure){if(!escaped)throw failure;}throw error;
  }finally{if(monitor!==undefined)clearInterval(monitor);}
 }

@@ -13,7 +13,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {assertTestFixtureIdentity,prepareTestFixture,cleanupTestFixture,scratchIdentity,fixtureEnvironmentBindings} from './test-fixtures.mjs';
 import {withStore} from './store.mjs';
-import {prepareOriginalWorkerLaunchFrom,spawnOriginalWorkerLaunch,cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {cleanupOriginalWorkerLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {prepareRuntimeWorkerLaunchFrom,spawnRuntimeWorkerLaunch,cleanupLegacyRuntimeLaunchFailure,runtimeExecutionDeadlineFrom} from './runtime-execution.mjs';
 
 export const ordinaryExecutionLifecycleProtocol='owned-scratch-close-v1';
 const BACKEND='macos-seatbelt-node';
@@ -260,12 +261,37 @@ export function ordinaryExecutionReceiptMatches(message,expected) {
 // The descriptor identifies an existing assignment; it is never a launch token
 // or a caller assertion of capacity. Each process acquires its own opaque token
 // from the actual owning Store transaction at its concrete spawn boundary.
-function spawnDevelopmentExecution(originalExecution,command,args,options){
-  if(originalExecution===undefined)return spawn(command,args,options);
-  if(!closedObject(originalExecution,['root','job_id'])||typeof originalExecution.root!=='string'||!path.isAbsolute(originalExecution.root)||typeof originalExecution.job_id!=='string'||!originalExecution.job_id||originalExecution.job_id.length>200)throw Error('Original development assignment identity required');
-  try{return withStore(originalExecution.root,store=>{let launch;store.transaction('development.execution_launch_requested',state=>{launch=prepareOriginalWorkerLaunchFrom(store,state,{job_id:originalExecution.job_id,kind:'development'});return state;});return spawnOriginalWorkerLaunch(launch,command,args,options);});}
-  catch(error){cleanupOriginalWorkerLaunchFailure(error);throw error;}
+// Only these Source-built loans identify a concrete company test recipe.
+// The exported inspector cannot mint a loan or turn caller DATA into a recipe.
+const runtimeDevelopmentDescriptors=new WeakMap();
+function runtimeDevelopmentDescriptor(originalExecution,{command,args,options,recipe,request_sha256,directory,test_paths,timeout_ms,max_output_bytes,test_fixture,signal,onCutoff}){
+  if(originalExecution===undefined)return undefined;
+  if(!closedObject(originalExecution,['root','job_id'])||typeof originalExecution.root!=='string'||!path.isAbsolute(originalExecution.root)||typeof originalExecution.job_id!=='string'||!originalExecution.job_id||originalExecution.job_id.length>200)throw Error('Company development assignment identity required');
+  const slot=recipe==='watchdog'?'watchdog':recipe==='sandbox_test_child'?'test_child':null;
+  if(slot===null)throw Error('Unsupported company development recipe');
+  const freeze=value=>{if(value&&typeof value==='object'){for(const item of Object.values(value))freeze(item);Object.freeze(value);}return value;};
+  const data=freeze(JSON.parse(JSON.stringify({command,args,options,recipe,request_sha256,root:fs.realpathSync(originalExecution.root),job_id:originalExecution.job_id,slot,parent_pid:process.pid,directory,test_paths,timeout_ms,max_output_bytes,test_fixture:test_fixture??null})));
+  const facts=Object.freeze({...data,signal:signal??null,onCutoff:onCutoff??null});
+  const loan=Object.freeze({});runtimeDevelopmentDescriptors.set(loan,facts);return loan;
 }
+export function inspectRuntimeDevelopmentDescriptorFrom(loan,{root,job_id,slot}={}){
+  const facts=runtimeDevelopmentDescriptors.get(loan);
+  if(!facts||facts.root!==root||facts.job_id!==job_id||(slot!==undefined&&facts.slot!==slot)||facts.parent_pid!==process.pid)throw Object.assign(Error('Private Source development descriptor required'),{code:'RUNTIME_EXECUTION_DESCRIPTOR_REQUIRED'});
+  return facts;
+}
+function runtimeTimeout(originalExecution,child,maximum){
+  if(originalExecution===undefined)return maximum;
+  const deadline=runtimeExecutionDeadlineFrom(child),now=Date.now();
+  if(!Number.isSafeInteger(now)||now<0||!Number.isSafeInteger(deadline)||deadline<0)throw Error('Actual runtime child cutoff unavailable');
+  return Math.max(0,Math.min(maximum,deadline-now));
+}
+function spawnDevelopmentExecution(originalExecution,command,args,options,descriptor){
+  if(originalExecution===undefined)return spawn(command,args,options);
+  if(!closedObject(originalExecution,['root','job_id'])||typeof originalExecution.root!=='string'||!path.isAbsolute(originalExecution.root)||typeof originalExecution.job_id!=='string'||!originalExecution.job_id||originalExecution.job_id.length>200)throw Error('Company development assignment identity required');
+  try{return withStore(originalExecution.root,store=>{let launch;store.transaction('development.execution_launch_requested',state=>{launch=prepareRuntimeWorkerLaunchFrom(store,state,{job_id:originalExecution.job_id,kind:'development'},descriptor);return state;});return spawnRuntimeWorkerLaunch(launch);});}
+  catch(error){cleanupLegacyRuntimeLaunchFailure(error);cleanupOriginalWorkerLaunchFailure(error);throw error;}
+}
+
 export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_output_bytes=100000,signal,testFixture,originalExecution}={}) {
   const root=checkDirectory(directory);
   if(!Array.isArray(test_paths) || !test_paths.length || test_paths.length>64 || new Set(test_paths).size!==test_paths.length)throw new Error('Supply 1 to 64 unique test paths');
@@ -291,16 +317,41 @@ export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_o
     const request={protocol:ordinaryExecutionLifecycleProtocol,request_id:randomBytes(32).toString('hex'),
       runner_sha256:runnerSourceSha256(),request_sha256:cryptoHash(JSON.stringify(payload)),controller_pid:process.pid};
     return await new Promise(resolve=>{
-      let done=false,sandboxPid=null,errorText='',fixtureSetup=null,ready=false;
-      const helper=spawnDevelopmentExecution(originalExecution,node,[fileURLToPath(import.meta.url),'--watch-tests',JSON.stringify({request,payload})],{env:{PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'},stdio:['ignore','ignore','pipe','ipc'],detached:true});
+      let done=false,settled=false,helperClosed=false,pendingResult=null,sandboxPid=null,errorText='',fixtureSetup=null,ready=false;
+      const helperArgs=[fileURLToPath(import.meta.url),'--watch-tests',JSON.stringify({request,payload})];
+      const helperOptions={env:{PATH:'/usr/bin:/bin',OPENSSL_CONF:'/dev/null'},stdio:['ignore','ignore','pipe','ipc'],detached:true};
+      const descriptor=runtimeDevelopmentDescriptor(originalExecution,{command:node,args:helperArgs,options:helperOptions,recipe:'watchdog',request_sha256:request.request_sha256,directory:root,test_paths:paths.map(file=>file.slice(2)),timeout_ms,max_output_bytes,test_fixture:fixture,signal});
+      const helper=spawnDevelopmentExecution(originalExecution,node,helperArgs,helperOptions,descriptor);
       binding={...request,watchdog_pid:helper.pid??null};
       const abort=()=>{try{if(helper.connected)helper.send({type:'abort',binding},()=>{});}catch{}};
-      const finish=result=>{
-        if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
+      const settle=result=>{
+        if(settled)return;settled=true;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);
         try{if(helper.connected)helper.disconnect();}catch{}resolve(result);
       };
+      const finish=result=>{
+        if(done)return;done=true;pendingResult=result;
+        // A result message does not close its watchdog. Keep the finite timer
+        // until the actual child close; the guarded close observer runs first.
+        try{if(helper.connected)helper.disconnect();}catch{}
+        if(helperClosed)settle(result);
+      };
       const reject=message=>{abort();finish(failed(message,errorText,fixtureSetup));};
-      const timer=setTimeout(()=>{abort();helper.kill('SIGKILL');finish(failed('Test watchdog did not finish within its deadline',errorText,fixtureSetup));},timeout_ms+5000);
+      const timer=setTimeout(()=>{
+        abort();try{helper.kill('SIGKILL');}catch{}
+        // A missing helper close cannot erase an earlier authenticated test
+        // result. The guarded helper slot retains its separate UNKNOWN state.
+        const result=pendingResult===null?failed('Test watchdog did not close within its deadline',errorText,fixtureSetup):{...pendingResult,status:'error',error:(pendingResult.error?String(pendingResult.error).slice(0,1000)+'; ':'')+'Test watchdog closure is unconfirmed at its deadline; prior test evidence retained'};
+        settle(result);
+      },runtimeTimeout(originalExecution,helper,timeout_ms+5000));
+      helper.once('close',(code,closedSignal)=>{
+        helperClosed=true;
+        if(pendingResult!==null){
+          // Preserve the test evidence while retaining a later negative from
+          // the actual watchdog; a prior message cannot override that exit.
+          const result=pendingResult.status==='passed'&&(code!==0||closedSignal!==null)?{...pendingResult,status:'error',error:'Test watchdog closed unsuccessfully after returning its result'}:pendingResult;
+          settle(result);
+        }else if(!done)finish(failed('Test watchdog closed without a matching receipt',errorText,fixtureSetup));
+      });
       signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
       helper.stderr.on('data',chunk=>{if(errorText.length<2000)errorText+=chunk.toString().slice(0,2000-errorText.length);});
       helper.on('message',message=>{
@@ -343,14 +394,16 @@ async function executeTests({root,scratch,paths,timeout_ms,max_output_bytes,sign
       // All profile/flag/environment construction is before the launch boundary.
       const args=['-p',sandboxProfile(root,scratch),node,...testArguments(root,scratch,paths)],env=environment(scratch,fixtureSetup);
       result=await new Promise(resolve=>{
-        let reason=null,size=0,out=[],err=[],done=false,exited=false,spawnError=null;
+        let reason=null,size=0,out=[],err=[],done=false,exited=false,spawnError=null,child=null;
+        const stop=(why,ownedChild=child)=>{if(done)return;if(!reason)reason=why;if(exited||!ownedChild)return;
+          try{if(positivePid(ownedChild.pid))process.kill(-ownedChild.pid,'SIGKILL');else ownedChild.kill('SIGKILL');}catch{try{ownedChild.kill('SIGKILL');}catch{}}};
         childEvidence.launch_attempted=true;
-        const child=spawnDevelopmentExecution(original_execution,'/usr/bin/sandbox-exec',args,{cwd:root,env,stdio:['ignore','pipe','pipe'],detached:true});
-        const stop=why=>{if(done)return;if(!reason)reason=why;if(exited)return;
-          try{if(positivePid(child.pid))process.kill(-child.pid,'SIGKILL');else child.kill('SIGKILL');}catch{try{child.kill('SIGKILL');}catch{}}};
+        const childOptions={cwd:root,env,stdio:['ignore','pipe','pipe'],detached:true};
+        const descriptor=runtimeDevelopmentDescriptor(original_execution,{command:'/usr/bin/sandbox-exec',args,options:childOptions,recipe:'sandbox_test_child',request_sha256:binding.request_sha256,directory:root,test_paths:paths.map(file=>file.slice(2)),timeout_ms,max_output_bytes,test_fixture:testFixture,signal,onCutoff:ownedChild=>stop('timeout',ownedChild)});
+        child=spawnDevelopmentExecution(original_execution,'/usr/bin/sandbox-exec',args,childOptions,descriptor);
         child.once('exit',()=>{exited=true;});
         child.once('spawn',()=>{childEvidence.spawn_observed=true;childEvidence.pid=child.pid;onStart?.(child.pid);});
-        const timer=setTimeout(()=>stop('timeout'),timeout_ms);
+        const timer=setTimeout(()=>stop('timeout'),runtimeTimeout(original_execution,child,timeout_ms));
         const abort=()=>stop('aborted');signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
         const capture=(list,chunk)=>{
           const remaining=Math.max(0,max_output_bytes-size);if(remaining)list.push(chunk.subarray(0,remaining));

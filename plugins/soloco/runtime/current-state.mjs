@@ -9,6 +9,7 @@ import {buildQualificationEvidence,knownModelCatalog} from './upgrade-evidence.m
 import {validateQualificationExclusion,QUALIFICATION_PROTOCOL} from './context-qualification.mjs';
 import {NOTICE_SOURCES,isNoticeSourceId,isCanonicalNoticeSource,noticeSource,noticeSourceEntries,projectNotice} from './notice-sources.mjs';
 import {inspectOriginalWorkerAssignmentBookkeepingFrom,inspectOriginalExecutionOriginBookkeepingFrom} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {inspectLegacyRuntimeBookkeepingFrom,validateLegacyRuntimeJobShape,runtimeJobOccupied} from './runtime-execution.mjs';
 const fields=['id','kind','author_role','recorded_by','content','status','action','previous_name','name','created_at'];
 const knownStateFields=new Set(['id','name','idea','owner','schema','runtime_version','plugin_version','revision','created_at','updated_at','paused','mode','phase','team_sha256','governance','governance_sha256','cos_instructions','roles','records','jobs','sessions','notices','messages','upgrade','upgrade_history','retired_sessions','context_classifications','context_last_plan','handover']);
 const proofJobFields=new Set(['code_review_window_minutes','code_review_reason','code_review_subject','delivered_record_reads','model_process_tracking','specialist','id','role','instance_id','session_key','native_id','host','epoch','status','artifact_id','review_of','inputs','context_format','context_scope','context_sha256','task','task_summary','next_handoff','model_selection','model_catalog','model_evidence','cli_version','requester','coordination','coordination_release','qualification_hold','expected_deliverable','supplemental_sources','retrieved_inputs','created_at','started_at','finished_at','worker_pid','timeout_policy_version','timeout_minutes','timeout_ms','timeout_reason','execution_started_at','execution_deadline_at','termination_deadline_at']);
@@ -18,6 +19,11 @@ export function proofJobSafe(job,state=null) {
     const proof=inspectOriginalWorkerAssignmentBookkeepingFrom(state,job);
     if(!proof||proof.field!=='original_execution_assignment'||!(proof.historical_original===true||proof.active_original_snapshot===true))return false;
     const {original_execution_assignment,...legacy}=job;job=legacy;
+  }
+  if(job&&Object.hasOwn(job,'legacy_runtime')){
+    const proof=inspectLegacyRuntimeBookkeepingFrom(state,job);
+    if(!proof||proof.field!=='legacy_runtime'||!(proof.historical_unqualified===true||proof.active_unqualified_snapshot===true)||JSON.stringify(proof.projection)!==JSON.stringify(job.legacy_runtime))return false;
+    const {legacy_runtime,...business}=job;job=business;
   }
   if(job&&Object.hasOwn(job,'specialist')&&!validateSpecialistBindingShape(job.specialist))return false;
   if(Object.keys(job).some(k=>!proofJobFields.has(k)))return false;
@@ -52,6 +58,17 @@ export function proofJobSafe(job,state=null) {
     }else return false; // Complex/unknown legacy metadata needs explicit review.
   }
   return true;
+}
+// Acceptance stores a full immutable job reference. A guarded worker may still
+// close after publishing its result, so wait at acceptance (not context reads)
+// until its physical mechanical fields can no longer change that reference.
+export function runtimeReceiptClosed(state,job){
+  if(!job||typeof job!=='object'||Array.isArray(job))return false;
+  if(!Object.hasOwn(job,'legacy_runtime'))return true;
+  const proof=inspectLegacyRuntimeBookkeepingFrom(state,job);
+  if(!proof||proof.field!=='legacy_runtime'||!(proof.historical_unqualified===true||proof.active_unqualified_snapshot===true)||JSON.stringify(proof.projection)!==JSON.stringify(job.legacy_runtime)||!validateLegacyRuntimeJobShape(job))return false;
+  const worker=job.legacy_runtime.worker;
+  return Boolean(worker?.birth&&worker.closure&&!runtimeJobOccupied(job));
 }
 export function currentExtensions(state) {
   // Prospective mechanical metadata is omitted only after exact receipt/index

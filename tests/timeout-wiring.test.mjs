@@ -66,7 +66,7 @@ function harness(publicOverrides={}) {
     }};
   // Conditional VM sentinels never reach the canonical producer or adapter.
   // Actual Original custody is covered by the real SQLite regression roots.
-  const vmLaunches=new WeakMap(),vmStores=new WeakMap(),vmInspectors=new Map();let vmBirthSequence=0;
+  const vmLaunches=new WeakMap(),vmStores=new WeakMap(),vmInspectors=new Map(),vmWorkerRequests=new Map();let vmBirthSequence=0;
   const iso=()=>new Date(now).toISOString();
   // These identities and loans exist ONLY in this stripped-import VM. The
   // synthetic Store has no SQLite/Original provenance, and neither its loans
@@ -85,12 +85,12 @@ function harness(publicOverrides={}) {
     assert.ok(facts.code===null||typeof facts.code==='string');assert.equal(typeof facts.message,'string');
     if(!record.active.cutoff||facts.deadline_at_ms<record.active.cutoff.deadline_at_ms)record.active.cutoff=Object.freeze({...facts});
   };
-  const vmWithStore=(_root,fn)=>{
+  const vmOpenStore=_root=>{
     const db=Object.freeze({prepare:sql=>{
       assert.equal(sql,"SELECT 1 FROM sqlite_master WHERE type='table' AND name='company_layout'",'VM fixture has no general SQL capability');
       return {get:()=>undefined}; // explicitly synthetic legacy fallback only
     }}),record={db,open:true,active:null};
-    const store={root:_root,db,readSnapshot:callback=>callback(),publicReconciliationState:()=>null,read:()=>structuredClone(state),transaction:(type,change,options={})=>{
+    const store={root:_root,db,close:()=>{record.open=false;},readSnapshot:callback=>{assert.ok(record.open,'Closed synthetic Store');return callback();},publicReconciliationState:()=>null,read:()=>{assert.ok(record.open,'Closed synthetic Store');return structuredClone(state);},transaction:(type,change,options={})=>{
       assert.equal(record.active,null,'No nested VM write scope');
       if(beforeTransaction){const hook=beforeTransaction;beforeTransaction=undefined;hook(type);}
       const active={scope:Object.freeze(Object.create(null)),type,state:structuredClone(state),cutoff:null,launches:[]};record.active=active;
@@ -101,14 +101,21 @@ function harness(publicOverrides={}) {
         state=structuredClone(next);for(const launch of active.launches)launch.armed=true;return structuredClone(state);
       }finally{for(const launch of active.launches)if(!launch.armed)launch.invalid=true;record.active=null;}
     }};
-    vmStores.set(store,record);vmStores.set(db,record);
-    try{return fn(store);}finally{record.open=false;}
+    vmStores.set(store,record);vmStores.set(db,record);return store;
+  };
+  const vmWithStore=(_root,fn)=>{const store=vmOpenStore(_root);try{return fn(store);}finally{store.close();}};
+  const vmModelObservation=(token,birth,receipt)=>{
+    const launch=vmLaunches.get(token);
+    assert.ok(launch?.armed&&!launch.invalid&&launch.used&&launch.kind==='model','Synthetic model request required');
+    assert.equal(JSON.stringify(birth),JSON.stringify(launch.birth),'Synthetic birth must belong to this VM request');
+    if(receipt!==undefined)assert.equal(JSON.stringify(receipt),JSON.stringify(launch.receipt),'Synthetic close must belong to this VM request');
+    return launch;
   };
   const deps={...developmentBudget,...reviewContinuation,...retentionRepair,...modelProcessClosure,requestModelProcess:(job,value)=>modelProcessClosure.requestModelProcess(job,structuredClone(value)),outcomeSchema,developmentDeliveryContractSchema,developmentDeliveryTransitionFields,boundedDevelopmentAcceptanceReply,renderDevelopmentReviewContext,Buffer,...scopedStream,scoped:{...scoped},...publicResponse,...coordination,...timeout,path,os:{homedir:()=>'/unused'},fs:vmFs,process:{cwd:()=>process.cwd(),env:{},pid:42,execPath:'/unused/node',argv:[]},Date:class extends Date {static now(){return now;}},AbortController,
     PACKAGE:'/unused',VERSION:'test',SCHEMA:2,stamp:iso,id:p=>p+'-'+(++sequence),digest:()=> 'binding',folder:x=>x,noLink:()=>{},
     // No changeToken is supplied: every VM tick must revalidate the mutable
     // controlled state, including non-store context/scope boundary doubles.
-    withStore:vmWithStore,originalStoreExecutionCustodyFrom:vmCustody,retainOriginalStoreCommitCutoffFrom:vmRetainCutoff,
+    Store:class{constructor(root){return vmOpenStore(root);}},withStore:vmWithStore,originalStoreExecutionCustodyFrom:vmCustody,retainOriginalStoreCommitCutoffFrom:vmRetainCutoff,
     owner:(s,session,host,epoch)=>{if(s.owner.session_id!==session || s.owner.host!==host || (epoch!==undefined && s.owner.epoch!==epoch))throw new Error('Stale owner');},
     notice:(s,kind,summary,reference)=>{const n={kind,summary,reference};s.notices.push(n);return n;},
     requireText:(v,label,max=20000)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw new Error('Invalid '+label);return v;},
@@ -119,12 +126,37 @@ function harness(publicOverrides={}) {
     developmentAssignment:()=>{if(!scope)throw new Error('Scope revoked');},prototypeAssignment:()=>{},
     developmentLimits:()=>({max_bytes:100000}),developmentCapability:()=>({}),prototypeCapability:()=>({}),developmentAction:()=>{},prototypeAction:()=>{},
     developmentBundle:()=>null,prototypeBundle:()=>null,developmentPrompt:()=>'',prototypePrompt:()=>'',
-    parseArtifact:JSON.parse,runModel:()=>{throw new Error('Real model forbidden');},dataDir:()=>'/unused',
+    parseArtifact:JSON.parse,runModel:()=>{throw new Error('Real model forbidden');},runRuntimeModel:()=>{throw new Error('Real runtime model forbidden');},dataDir:()=>'/unused',
     recordOriginalWorkerAssignmentFrom:(store,current,job)=>{assert.equal(vmCustody(store).state,current);return job;},
-    prepareOriginalWorkerLaunchFrom:(store,current,input)=>{assert.equal(vmCustody(store).state,current);const token=Object.freeze(Object.create(null)),launch={kind:input.kind,used:false,armed:false,invalid:false};vmLaunches.set(token,launch);vmStores.get(store).active.launches.push(launch);return token;},
+    prepareOriginalWorkerLaunchFrom:(store,current,input)=>{assert.equal(vmCustody(store).state,current);const token=Object.freeze(Object.create(null)),launch={kind:input.kind,job_id:input.job_id,invocation_id:input.invocation_id??null,store,used:false,armed:false,invalid:false};vmLaunches.set(token,launch);vmStores.get(store).active.launches.push(launch);return token;},
     spawnOriginalWorkerLaunch:(token,...args)=>{const launch=vmLaunches.get(token);assert.ok(launch?.armed&&!launch.invalid&&!launch.used&&launch.kind==='worker');launch.used=true;return deps.spawn(...args);},
     // No actual Original child is created or privately branded by this VM.
     cleanupOriginalWorkerLaunchFailure:()=>false,originalWorkerFailedLaunchClosed:()=>null,
+    cleanupLegacyRuntimeLaunchFailure:()=>false,legacyRuntimeFailedLaunchClosed:()=>null,
+    // Runtime API names below choose conditional branches only in this complete
+    // SYNTHETIC VM graph. No canonical issuer, Store or adapter consumes these
+    // tokens; neither the branch label nor callback DATA claims Native birth.
+    recordRuntimeWorkerAssignmentFrom:(...args)=>deps.recordOriginalWorkerAssignmentFrom(...args),
+    prepareRuntimeWorkerLaunchFrom:(...args)=>deps.prepareOriginalWorkerLaunchFrom(...args),
+    spawnRuntimeWorkerLaunch:token=>{
+      const launch=vmLaunches.get(token);assert.ok(launch?.armed&&!launch.invalid&&!launch.used&&launch.kind==='worker');launch.used=true;
+      vmWorkerRequests.set(launch.job_id,token);return deps.spawn({synthetic_worker:launch.job_id});
+    },
+    runtimeExecutionLaneFrom:(store,current)=>{assert.equal(vmCustody(store).state,current);return 'original';},
+    prepareRuntimeModelRequestFrom:(store,current)=>{assert.equal(vmCustody(store).state,current);return null;},
+    isLegacyRuntimeModelCapabilityFrom:()=>false,
+    assertRuntimeWorkerStartedFrom:(store,current,jobId)=>{assert.equal(vmCustody(store).state,current);assert.ok(vmWorkerRequests.has(jobId),'Synthetic worker request required');return true;},
+    runtimeJobOccupied:job=>{assert.equal(Object.hasOwn(job,'legacy_runtime'),false,'This VM does not represent a production legacy route');return false;},
+    assertRuntimeAdapterModelBirthFrom:(token,birth)=>{vmModelObservation(token,birth);return true;},
+    assertRuntimeAdapterModelClosureFrom:(token,birth,receipt)=>{vmModelObservation(token,birth,receipt);return true;},
+    approveRuntimeModelProcessObservationFrom:(store,current,token,field,birth,receipt)=>{
+      assert.equal(vmCustody(store).state,current);assert.ok(['birth','closure'].includes(field));vmModelObservation(token,birth,field==='closure'?receipt:undefined);return true;
+    },
+    assertRuntimeModelProcessObservedFrom:(token,birth,receipt)=>{
+      const launch=vmModelObservation(token,birth,receipt);assert.ok(receipt&&vmStores.get(launch.store)?.open,'Synthetic issuer must survive await');
+      const entry=state.jobs[launch.job_id]?.model_process_tracking?.invocations.find(value=>value.invocation_id===launch.invocation_id);
+      assert.equal(JSON.stringify(entry?.birth),JSON.stringify(birth));assert.equal(JSON.stringify(entry?.closure),JSON.stringify(receipt));return true;
+    },
     setInterval:(fn,ms)=>{assert.equal(ms,100);intervals.add(fn);return fn;},clearInterval:fn=>intervals.delete(fn),
     // This VM supplies a synthetic legacy Store; peer routing/storage behavior
     // is covered by the actual SQLite and root-ingress suites.
@@ -147,8 +179,8 @@ function harness(publicOverrides={}) {
     // closed. Preserve every request round through explicit conditional
     // birth/close DATA instead of erasing an earlier unobserved invocation.
     const birth={protocol:'ordinary-model-process-birth-v1',launch_id:'SYNTHETIC-VM-'+(++vmBirthSequence),host:args[0],pid:10000+vmBirthSequence,worker_pid:42,spawned_at:iso(),command_sha256:'a'.repeat(64),argv_sha256:'b'.repeat(64),cwd_sha256:'c'.repeat(64)};
-    options.onModelProcess(birth);
-    const close=()=>options.onModelClosure(birth,{protocol:'ordinary-model-process-close-v1',birth_sha256:createHash('sha256').update(JSON.stringify(birth)).digest('hex'),closed_at:iso(),exit_code:0,signal:null,observation:'original-child-close'});
+    launch.birth=structuredClone(birth);options.onModelProcess(birth);
+    const close=()=>{const receipt={protocol:'ordinary-model-process-close-v1',birth_sha256:createHash('sha256').update(JSON.stringify(birth)).digest('hex'),closed_at:iso(),exit_code:0,signal:null,observation:'original-child-close'};launch.receipt=structuredClone(receipt);options.onModelClosure(birth,receipt);};
     try{const result=await runner(...args);if(result?.termination_confirmed!==false)close();return result;}
     catch(error){if(error?.termination_confirmed===true)close();throw error;}
   }:runner,...rest);

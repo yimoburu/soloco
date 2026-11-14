@@ -14,6 +14,7 @@ import * as originalMechanicalPolicy from './peers/origin-mechanical-qa-policy.m
 import * as originalEngine from './engine.mjs';
 import * as originalWorker from './worker.mjs';
 import * as originalDevelopment from './develop.mjs';
+import {beginRuntimeExecutionWriteFrom,prepareRuntimeExecutionWriteFrom,validateRuntimeExecutionCommitFrom,runtimeExecutionCommitCutoffFrom,runtimeExecutionUsesNativeClockFrom,commitRuntimeExecutionWriteFrom,endRuntimeExecutionWriteFrom,bindRuntimeBookkeepingFrom} from './runtime-execution.mjs';
 export {PACKAGE,VERSION,skillBody,installedTeam,teamHash} from './team-source.mjs';
 
 // Explicitly tested state producers, not a blanket semver compatibility promise.
@@ -47,6 +48,23 @@ export function noLink(file) {
 // Only these exact class-created objects can lend the original inventory its
 // current physical snapshot. Public properties alone are not a transaction.
 const originalStores=new WeakMap(),originalDatabases=new WeakMap();
+const runtimeCommitWitnesses=new WeakMap();
+const runtimeRealNow=Date.now;
+const runtimeSafeInteger=Number.isSafeInteger;
+const runtimeNativeExec=DatabaseSync.prototype.exec;
+const runtimeNativeBind=Function.prototype.bind,runtimeNativeApply=Reflect.apply;
+// Only this lexical Store code can mint a successful physical-commit witness.
+// A transaction callback cannot arm a launch by reporting that COMMIT worked.
+function runtimeCommitWitness(store){
+  const owned=originalStores.get(store);
+  if(!owned||!owned.active||owned.mode!=='write'||store.closed||store.db!==owned.db||store.root!==owned.root||owned.db.isTransaction!==false)throw Object.assign(Error('Actual Store physical commit required'),{code:'LEGACY_RUNTIME_COMMIT_WITNESS_REQUIRED'});
+  const witness=Object.freeze({});runtimeCommitWitnesses.set(witness,{store,db:owned.db,root:owned.root,scope:owned.scope});return witness;
+}
+export function inspectRuntimeStoreCommitWitnessFrom(witness,store){
+  const facts=runtimeCommitWitnesses.get(witness),owned=originalStores.get(store);
+  if(!facts||!owned||facts.store!==store||facts.db!==owned.db||facts.root!==owned.root||facts.scope!==owned.scope||!owned.active||owned.mode!=='write'||store.closed||owned.db.isTransaction!==false)throw Object.assign(Error('Actual Store physical commit witness required'),{code:'LEGACY_RUNTIME_COMMIT_WITNESS_REQUIRED'});
+  return Object.freeze({root:facts.root,scope:facts.scope});
+}
 export function originalStoreExecutionCustodyFrom(subject){
   const owned=originalStores.get(subject)??originalDatabases.get(subject);
   if(!owned)throw Object.assign(Error('Original execution requires an actual Store snapshot'),{code:'ORIGINAL_EXECUTION_STORE_REQUIRED'});
@@ -67,13 +85,20 @@ export function retainOriginalStoreCommitCutoffFrom(subject,proof,issuer='mechan
 }
 export function originalStoreRetainedCommitCutoffFrom(store){const loan=originalStoreExecutionCustodyFrom(store);if(loan.mode!=='write')throw Object.assign(Error('Original write cutoff scope required'),{code:'ORIGINAL_EXECUTION_COMMIT_CUTOFF_REQUIRED'});return originalStores.get(loan.store).commitCutoff?.deadline_at_ms??null;}
 function checkOriginalCommitCutoff(store){
-  const owned=originalStores.get(store),launch=originalStoreExecutionCommitCutoffFrom(store),policy=owned.commitCutoff;
+  const owned=originalStores.get(store),originalLaunch=originalStoreExecutionCommitCutoffFrom(store),runtimeLaunch=runtimeExecutionCommitCutoffFrom(store),launch=originalLaunch===null?runtimeLaunch:runtimeLaunch===null?originalLaunch:Math.min(originalLaunch,runtimeLaunch),policy=owned.commitCutoff;
   const deadline=policy===null?launch:launch===null?policy.deadline_at_ms:Math.min(policy.deadline_at_ms,launch);
-  if(deadline===null)return;
+  const nativeClock=runtimeExecutionUsesNativeClockFrom(store),nativeChecker=nativeClock?runtimeSafeInteger:null;
+  let nativeCommit=null;
+  if(nativeClock){
+    if(owned.db.exec!==runtimeNativeExec)throw Object.assign(Error('Legacy physical COMMIT entry changed'),{code:'LEGACY_RUNTIME_COMMIT_ENTRY_CHANGED'});
+    nativeCommit=runtimeNativeApply(runtimeNativeBind,runtimeNativeExec,[owned.db,'COMMIT']);
+  }
+  if(deadline===null)return nativeCommit;
   // All mutable/provider/integrity reads are over. The next operation after
   // this one primitive clock sample is the owning physical COMMIT.
-  const now=Date.now();
-  if(!Number.isSafeInteger(now)||now<0||now>=deadline){const usePolicy=policy!==null&&policy.deadline_at_ms<=deadline,error=Error(usePolicy?policy.message:'Original authority expired before physical commit'),code=usePolicy?policy.code:'ORIGINAL_EXECUTION_CUTOFF_EXPIRED';if(code!==null)error.code=code;throw error;}
+  const now=nativeClock?runtimeRealNow():Date.now();
+  if(!(nativeClock?nativeChecker(now):Number.isSafeInteger(now))||now<0||now>=deadline){const usePolicy=policy!==null&&policy.deadline_at_ms<=deadline,error=Error(usePolicy?policy.message:'Original authority expired before physical commit'),code=usePolicy?policy.code:'ORIGINAL_EXECUTION_CUTOFF_EXPIRED';if(code!==null)error.code=code;throw error;}
+  return nativeCommit;
 }
 function checkBeforeCommit(check,db,state){
   if(check===undefined)return;
@@ -139,7 +164,10 @@ function checkedAttachedWritable(store){
 }
 function rollbackStore(store,error){
   const attached=attachedStores.get(store);
-  if(!attached){store.db.exec('ROLLBACK');throw error;}
+  // A post-COMMIT arming failure is still the original failure. There is no
+  // transaction left to roll back; do not replace its private child custody
+  // with a new "no transaction" error.
+  if(!attached){try{if(store.db.isTransaction)store.db.exec('ROLLBACK');}catch(cleanup){throw new AggregateError([error,cleanup],'Store operation and rollback failed',{cause:error});}throw error;}
   try{if(attached.connection.isTransaction)attached.connection.exec('ROLLBACK');}
   catch(cleanup){throw new AggregateError([error,cleanup],'Attached Store operation and rollback failed',{cause:error});}
   throw error;
@@ -285,6 +313,7 @@ export class Store {
       return new Store(this.root,false,{readOnly:reopenReadOnly});
     });
     bindOriginalWorkerAssignmentBookkeepingFrom(this,bound);
+    bindRuntimeBookkeepingFrom(this,bound);
     return bound;
   }
   readSelected(options) { return this.readSnapshot(()=>normalizedLayout(this.db)?this.snapshotState(readNormalized(this.db,options)):this.read()); }
@@ -381,11 +410,13 @@ export class Store {
     const owned=originalScope(this,'write',type);
     try {
       beginOriginalStoreExecutionWriteFrom(this,type);
+      beginRuntimeExecutionWriteFrom(this,type);
       const metadata=captureStorageMetadata(this.db);
       const state=this.snapshotState(readNormalized(this.db,options)),before=JSON.stringify(state);
       owned.state=state;const result=fn(state);
       checkAttached(this,true);
       prepareOriginalStoreExecutionWriteFrom(this,state,{selected:true,before:JSON.parse(before)});
+      prepareRuntimeExecutionWriteFrom(this,state,{selected:true,before:JSON.parse(before)});
       state.revision=(state.revision??0)+1;state.updated_at=stamp();
       const changes=[];const old=JSON.parse(before);
       for(const key of new Set([...Object.keys(old),...Object.keys(state)])) {const value=state[key];
@@ -400,11 +431,13 @@ export class Store {
       insertStorageEvent(this.db,type,originalStoreExecutionEventFrom(this,{revision:state.revision,owner:state.owner}),metadata);
       checkBeforeCommit(beforeCommit,this.db,state);
       validateOriginalStoreExecutionCommitFrom(this);
+      validateRuntimeExecutionCommitFrom(this);
       checkAttached(this,true);
-      checkOriginalCommitCutoff(this);
-      this.db.exec('COMMIT');commitOriginalStoreExecutionWriteFrom(this);this.snapshotState(state);return result;
+      const nativeCommit=checkOriginalCommitCutoff(this);
+      if(nativeCommit===null)this.db.exec('COMMIT');else nativeCommit();
+      commitOriginalStoreExecutionWriteFrom(this);this.snapshotState(state);commitRuntimeExecutionWriteFrom(this,runtimeCommitWitness(this));return result;
     }catch(error){rollbackStore(this,error);}
-    finally {endOriginalStoreExecutionWriteFrom(this);originalEnd(this);this.inTransaction=false;}
+    finally {endRuntimeExecutionWriteFrom(this);endOriginalStoreExecutionWriteFrom(this);originalEnd(this);this.inTransaction=false;}
   }
   read() {
     return this.readSnapshot(()=>{
@@ -420,11 +453,13 @@ export class Store {
     const owned=originalScope(this,'write',type);
     try {
       beginOriginalStoreExecutionWriteFrom(this,type);
+      beginRuntimeExecutionWriteFrom(this,type);
       const metadata=normalizedLayout(this.db)?captureStorageMetadata(this.db):null;
       const state = this.read();
       owned.state=state;const next = fn(state);owned.state=next;
       checkAttached(this,true);
       prepareOriginalStoreExecutionWriteFrom(this,next);
+      prepareRuntimeExecutionWriteFrom(this,next);
       next.revision = (state?.revision ?? -1) + 1;
       next.updated_at = stamp();
       flushSnapshots(this.db,state,next);
@@ -435,13 +470,16 @@ export class Store {
       insertStorageEvent(this.db,type,originalStoreExecutionEventFrom(this,{revision:next.revision,owner:next.owner}),metadata);
       checkBeforeCommit(beforeCommit,this.db,next);
       validateOriginalStoreExecutionCommitFrom(this);
+      validateRuntimeExecutionCommitFrom(this);
       checkAttached(this,true);
-      checkOriginalCommitCutoff(this);
-      this.db.exec('COMMIT');
+      const nativeCommit=checkOriginalCommitCutoff(this);
+      if(nativeCommit===null)this.db.exec('COMMIT');else nativeCommit();
       commitOriginalStoreExecutionWriteFrom(this);
-      return this.snapshotState(next);
+      const result=this.snapshotState(next);
+      commitRuntimeExecutionWriteFrom(this,runtimeCommitWitness(this));
+      return result;
     } catch (error) { rollbackStore(this,error); }
-    finally {endOriginalStoreExecutionWriteFrom(this);originalEnd(this);this.inTransaction=false;}
+    finally {endRuntimeExecutionWriteFrom(this);endOriginalStoreExecutionWriteFrom(this);originalEnd(this);this.inTransaction=false;}
   }
   close() { const attached=attachedStores.get(this);if(attached)attached.closed=true;this.closed=true;if(!attached)this.db.close(); }
 }

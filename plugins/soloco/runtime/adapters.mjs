@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { normalizeTimeout, executionTiming, MIN_EXECUTION_TIMEOUT_MS, STARTUP_TIMEOUT_MS, TERMINATION_GRACE_MS } from './timeout.mjs';
 import {claudeNameSupport,nameCodexSession,writeNamingReceipt} from './session-naming.mjs';
 import {bindOriginalAdapterLaunchCutoffFrom,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure,assertOriginalModelLaunchToken,spawnOriginalModelLaunch,bindOriginalModelAdapterCutoffFrom,originalModelFailedLaunchChild,cleanupOriginalModelLaunchFailure} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {isLegacyRuntimeModelCapabilityFrom,assertLegacyRuntimeModelLaunchFrom,bindLegacyRuntimeModelAdapterFrom,spawnLegacyRuntimeModelLaunch,legacyRuntimeFailedLaunchChild,cleanupLegacyRuntimeLaunchFailure,runtimeExecutionObservationTimeFrom} from './runtime-execution.mjs';
 
 // Both fixed producer routes inspect this same actual adapter's private loan.
 // Neither a public deadline nor a copied token can create cutoff custody.
@@ -29,6 +30,37 @@ export function inspectOriginalAdapterLaunchCutoffFrom(loan,token){
   const record=originalModelCutoffs.get(loan);
   if(!record||record.token!==token)throw Object.assign(Error('Original adapter cutoff custody required'),{code:'ORIGINAL_EXECUTION_ADAPTER_CUTOFF_REQUIRED'});
   return Object.freeze({deadline_at_ms:record.deadline_at_ms,signal:record.signal});
+}
+
+// Only this adapter can bind a legacy model capability to its final Source-built
+// command. The loan is not a caller-provided launch descriptor or a new issuer.
+const legacyRuntimeAdapterLoans=new WeakMap();
+const runtimeModelObservations=new WeakMap();
+const sameObservation=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+export function assertRuntimeAdapterModelBirthFrom(token,birth){
+  const record=runtimeModelObservations.get(token);
+  if(!record?.child||!record.birth||!sameObservation(record.birth,birth)||record.birth.pid!==record.child.pid)throw Object.assign(Error('Private adapter model birth observation required'),{code:'MODEL_PROCESS_CLOSURE_HELD'});
+  return true;
+}
+export function assertRuntimeAdapterModelClosureFrom(token,birth,receipt){
+  const record=runtimeModelObservations.get(token);
+  assertRuntimeAdapterModelBirthFrom(token,birth);
+  if(!record.closed||!record.receipt||!sameObservation(record.receipt,receipt))throw Object.assign(Error('Private adapter model close observation required'),{code:'MODEL_PROCESS_CLOSURE_HELD'});
+  return true;
+}
+function legacyRuntimeAdapterLoan(token,command,args,options,deadline_at_ms,signal,execution_timeout_ms,execution_deadline_at_ms){
+  const loan=Object.freeze({});
+  const descriptor=Object.freeze({command,args:Object.freeze([...args]),options:Object.freeze({cwd:options.cwd,env:Object.freeze({...options.env}),stdio:Object.freeze([...options.stdio])}),deadline_at_ms,signal:signal??null,execution_timeout_ms,execution_deadline_at_ms:execution_deadline_at_ms??null});
+  legacyRuntimeAdapterLoans.set(loan,{token,descriptor,fault:false});return loan;
+}
+export function inspectLegacyRuntimeAdapterLoanFrom(loan,token){
+  const record=legacyRuntimeAdapterLoans.get(loan);
+  if(!record||record.token!==token)throw Object.assign(Error('Private runtime adapter descriptor required'),{code:'RUNTIME_EXECUTION_ADAPTER_REQUIRED'});
+  const now=Date.now(),{deadline_at_ms,signal}=record.descriptor;
+  if(!Number.isSafeInteger(deadline_at_ms)||deadline_at_ms<0||!Number.isSafeInteger(now)||now<0||now>=deadline_at_ms)record.fault=true;
+  if(signal!==null&&Reflect.apply(originalSignalAborted,signal,[]))record.fault=true;
+  if(record.fault)throw Object.assign(Error('Runtime model cutoff expired or cancelled'),{code:'RUNTIME_EXECUTION_MODEL_DEADLINE'});
+  return record.descriptor;
 }
 
 const ownFile=fileURLToPath(import.meta.url);
@@ -319,7 +351,7 @@ export function parseOutput(host, stdout) {
 
 // Existing positional calls remain valid. options is an internal dependency
 // seam, not an agent-controlled permission or a tool/API schema:
-// {signal, onSpawn(record), timeoutReason, spawn, resolveExecutable,
+// {signal, onSpawn(record), timeoutReason, resolveExecutable,
 //  now, setTimeout, clearTimeout, timeoutContext}. The internal upgrade-call
 // context permits at most 30 minutes; it supplies no business authority.
 // onSpawn is synchronous; a thrown recording
@@ -327,10 +359,26 @@ export function parseOutput(host, stdout) {
 // performed by this adapter. Worker eligibility and durable recording remain
 // the caller's responsibilities.
 export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selection=null, options={}) {
+  return runModelLifecycle(host,nativeId,prompt,cwd,timeout,selection,options,false);
+}
+
+// Ordinary legacy execution has its own private capability. The existing
+// runModel contract stays strict for Original, peer and upgrade callers.
+export function runRuntimeModel(host,nativeId,prompt,cwd,timeout=180000,selection=null,options={}){
+  if(options&&typeof options==='object'&&Object.hasOwn(options,'runtimeExecutionLaunch')){
+    if(!isLegacyRuntimeModelCapabilityFrom(options.runtimeExecutionLaunch)||options.originalExecutionLaunch!==undefined)return Promise.reject(Object.assign(Error('Private runtime model capability required'),{code:'RUNTIME_EXECUTION_MODEL_CAPABILITY_REQUIRED'}));
+    return runModelLifecycle(host,nativeId,prompt,cwd,timeout,selection,options,true);
+  }
+  return runModel(host,nativeId,prompt,cwd,timeout,selection,options);
+}
+
+function runModelLifecycle(host,nativeId,prompt,cwd,timeout,selection,options,legacyRuntime){
   return new Promise((resolve, reject) => {
     if (!options || typeof options !== 'object' || Array.isArray(options)) throw new Error('Invalid lifecycle options');
     if(options.spawn!==undefined)throw Object.assign(Error('Caller spawn overrides cannot create an original assignment process'),{code:'ORIGINAL_EXECUTION_LAUNCH_GATE_REQUIRED'});
-    const originalLaunch=assertOriginalModelLaunchToken(options.originalExecutionLaunch,{host,native_id:nativeId,prompt,cwd,selection});
+    if(!legacyRuntime&&Object.hasOwn(options,'runtimeExecutionLaunch'))throw Object.assign(Error('Original model launch capability required'),{code:'ORIGINAL_EXECUTION_LAUNCH_GATE_REQUIRED'});
+    const launchToken=legacyRuntime?options.runtimeExecutionLaunch:options.originalExecutionLaunch;
+    const originalLaunch=legacyRuntime?assertLegacyRuntimeModelLaunchFrom(launchToken,{host,native_id:nativeId,prompt,cwd,selection}):assertOriginalModelLaunchToken(launchToken,{host,native_id:nativeId,prompt,cwd,selection});
     if(options.beforeOriginalSpawn!==undefined&&typeof options.beforeOriginalSpawn!=='function')throw Error('Invalid original launch eligibility check');
     const policy = normalizeTimeout({timeout_ms:timeout, timeout_reason:options.timeoutReason}, options.timeoutContext);
     const outputLimit=options.maxOutputCharacters??2000000;
@@ -382,11 +430,17 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     if(signal?.aborted)throw errorFor('Role session cancelled before launch','ROLE_ABORTED');
     if(absoluteDeadline!==undefined&&readNow()>=absoluteDeadline)throw Object.assign(errorFor('Role review deadline reached before launch','ROLE_TIMEOUT'),{termination_confirmed:true});
     if(readNow()>=startupDeadline)throw Object.assign(errorFor('Role startup deadline reached before launch','ROLE_STARTUP_TIMEOUT'),{termination_confirmed:true});
-    const cutoffLoan=originalModelCutoff(options.originalExecutionLaunch,Math.min(originalDeadline,startupDeadline,absoluteDeadline??Infinity),signal);
-    if(!bindOriginalModelAdapterCutoffFrom(options.originalExecutionLaunch,cutoffLoan))bindOriginalAdapterLaunchCutoffFrom(options.originalExecutionLaunch,cutoffLoan);
+    const cutoff=Math.min(originalDeadline,startupDeadline,absoluteDeadline??Infinity);
+    if(legacyRuntime){
+      const loan=legacyRuntimeAdapterLoan(launchToken,command,args,{cwd,env,stdio:['pipe','pipe','pipe']},cutoff,signal,policy.timeout_ms,absoluteDeadline??null);
+      bindLegacyRuntimeModelAdapterFrom(launchToken,loan);
+    }else{
+      const cutoffLoan=originalModelCutoff(launchToken,cutoff,signal);
+      if(!bindOriginalModelAdapterCutoffFrom(launchToken,cutoffLoan))bindOriginalAdapterLaunchCutoffFrom(launchToken,cutoffLoan);
+    }
     let child,launchFailure=null;
-    try{child=spawnOriginalModelLaunch(options.originalExecutionLaunch,command,args,{cwd,env,stdio:['pipe','pipe','pipe']});}
-    catch(error){child=originalWorkerFailedLaunchChild(error)??originalModelFailedLaunchChild(error);if(!child)throw error;launchFailure=error;}
+    try{child=legacyRuntime?spawnLegacyRuntimeModelLaunch(launchToken):spawnOriginalModelLaunch(launchToken,command,args,{cwd,env,stdio:['pipe','pipe','pipe']});}
+    catch(error){child=legacyRuntimeFailedLaunchChild(error)??originalWorkerFailedLaunchChild(error)??originalModelFailedLaunchChild(error);if(!child)throw error;launchFailure=error;}
     let stdout='', stderr='', failure=null, settled=false, closed=false;
     const named=new Set();let namingBuffer='';
     const observedName=id=>{
@@ -396,18 +450,22 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     let spawned=false, executionDeadline=null;
     let startupTimer=null, executionTimer=null, killTimer=null;
     let processBirth=null,processClosure=false;
+    const physicalObservation={child,birth:null,receipt:null,closed:false};
+    runtimeModelObservations.set(launchToken,physicalObservation);
     const processHash=value=>createHash('sha256').update(value).digest('hex');
     const observeBirth=()=>{
       if(!observeProcess||processBirth)return;
       if(!Number.isSafeInteger(child.pid)||child.pid<=0)throw Error('Actual model process PID unavailable');
-      const birth={protocol:'ordinary-model-process-birth-v1',launch_id:randomUUID(),host,pid:child.pid,worker_pid:process.pid,spawned_at:new Date(readNow()).toISOString(),command_sha256:processHash(command),argv_sha256:processHash(JSON.stringify(args)),cwd_sha256:processHash(cwd)};
+      const birth={protocol:'ordinary-model-process-birth-v1',launch_id:randomUUID(),host,pid:child.pid,worker_pid:process.pid,spawned_at:new Date(legacyRuntime?runtimeExecutionObservationTimeFrom(child,'spawn'):readNow()).toISOString(),command_sha256:processHash(command),argv_sha256:processHash(JSON.stringify(args)),cwd_sha256:processHash(cwd)};
+      physicalObservation.birth=Object.freeze({...birth});
       const returned=options.onModelProcess(birth);
       if(returned&&typeof returned.then==='function')throw Error('Model process birth must be durably synchronous');
       processBirth=Object.freeze(birth);
     };
     const observeClose=(code,signal)=>{
       if(!observeProcess||processClosure||!processBirth)return;processClosure=true;
-      const receipt={protocol:'ordinary-model-process-close-v1',birth_sha256:processHash(JSON.stringify(processBirth)),closed_at:new Date(readNow()).toISOString(),exit_code:Number.isInteger(code)?code:null,signal:typeof signal==='string'?signal:null,observation:'original-child-close'};
+      const receipt={protocol:'ordinary-model-process-close-v1',birth_sha256:processHash(JSON.stringify(processBirth)),closed_at:new Date(legacyRuntime?runtimeExecutionObservationTimeFrom(child,'close'):readNow()).toISOString(),exit_code:Number.isInteger(code)?code:null,signal:typeof signal==='string'?signal:null,observation:'original-child-close'};
+      physicalObservation.receipt=Object.freeze({...receipt});
       // Observation failure leaves durable uncertainty; it never changes the
       // already-settled timeout/result or invents a public success response.
       try{const returned=options.onModelClosure(processBirth,receipt);if(returned&&typeof returned.then==='function')returned.catch(()=>{});}catch{}
@@ -498,7 +556,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     listen(child, 'spawn', () => {
       try{observeBirth();}catch(error){if(!settled)stop(error,readNow()+TERMINATION_GRACE_MS);return;}
       if (settled || failure || spawned || expired()) return;
-      const at=readNow();
+      const at=legacyRuntime?runtimeExecutionObservationTimeFrom(child,'spawn'):readNow();
       const duration=Math.min(policy.timeout_ms,absoluteDeadline===undefined?policy.timeout_ms:absoluteDeadline-at);
       if(duration<MIN_EXECUTION_TIMEOUT_MS){stop(timeoutFailure(),absoluteDeadline+TERMINATION_GRACE_MS);return;}
       const timing=executionTiming(at,{...policy,timeout_ms:duration},options.timeoutContext);
@@ -547,7 +605,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
     listen(child.stderr, 'error', onProcessError);
     listen(child.stdin, 'error', onProcessError);
     listen(child, 'close', (code,signal) => {
-      closed=true;observeClose(code,signal);
+      closed=true;physicalObservation.closed=true;observeClose(code,signal);
       // Actual close ends all original child and pipe observations, including
       // harmless errors retained while the timed-out pipes drained.
       cleanup();
@@ -578,6 +636,7 @@ export function runModel(host, nativeId, prompt, cwd, timeout = 180000, selectio
       try{observeBirth();}catch{/* failed observation remains UNKNOWN */}
       cleanupOriginalWorkerLaunchFailure(launchFailure);
       cleanupOriginalModelLaunchFailure(launchFailure);
+      cleanupLegacyRuntimeLaunchFailure(launchFailure);
       finish(launchFailure);
       return;
     }

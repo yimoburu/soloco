@@ -24,7 +24,7 @@ const RUNTIME=fileURLToPath(new URL('../',import.meta.url));
 // Node generation stays inside the runtime package in both layouts. Native
 // code/resources are independently pinned by the actual full Native recipe,
 // package inventory and original ordinary Source/native tuple below.
-const SOURCE_FILES=Object.freeze(['store.mjs','store-precommit-contract.mjs','record-storage.mjs','snapshot.mjs','plugin-data.mjs','engine.mjs','worker.mjs','adapters.mjs','timeout.mjs','model-process-closure.mjs','task-runtime.mjs','develop.mjs','local-sandbox.mjs','origin-mechanical-qa-worker.mjs','upgrade.mjs','current-state.mjs','task-context.mjs','peers/prospective-local-worker-inventory-producer.mjs','peers/ledger.mjs','peers/model.mjs','peers/membership.mjs','peers/bootstrap-membership.mjs','peers/bootstrap-membership-contract.mjs','peers/origin-quarantine.mjs','peers/origin-maintenance.mjs','peers/origin-mechanical-qa-policy.mjs','peers/input-frontier-maintenance.mjs','peers/origin-frontier-seal.mjs','peers/owner-handover.mjs','peers/protected-codex-domain.mjs','peers/codex-task-host.mjs','peers/scheduler.mjs','peers/origin-ordinary-task-contract.mjs','peers/origin-ordinary-task-transition.mjs','peers/origin-ordinary-task.mjs','peers/origin-ordinary-task-instruction.mjs','peers/origin-ordinary-task-readonly3-contract-v1.json','peers/origin-maintenance-authority.mjs','peers/owner-operating-state.mjs','peers/owner-transfer-intent.mjs','peers/origin-paused-bootstrap-accounting.mjs','peers/input-frontier-checkpoint.mjs','peers/origin-plan.mjs','peer-origin-runtime.mjs','peer-owner-runtime.mjs','peers/origin-maintenance-wire.mjs','peers/origin-maintenance-host.mjs','peers/maintenance-launch.mjs','peers/protected-context-channel.mjs','peers/protected-source-build-slot.mjs','peers/policy-supervisor.mjs','peers/context-component-deployment.mjs']);
+const SOURCE_FILES=Object.freeze(['store.mjs','runtime-execution.mjs','legacy-storage-proof.mjs','store-precommit-contract.mjs','record-storage.mjs','snapshot.mjs','plugin-data.mjs','engine.mjs','worker.mjs','adapters.mjs','timeout.mjs','model-process-closure.mjs','task-runtime.mjs','develop.mjs','local-sandbox.mjs','origin-mechanical-qa-worker.mjs','upgrade.mjs','current-state.mjs','task-context.mjs','peers/prospective-local-worker-inventory-producer.mjs','peers/ledger.mjs','peers/model.mjs','peers/membership.mjs','peers/bootstrap-membership.mjs','peers/bootstrap-membership-contract.mjs','peers/origin-quarantine.mjs','peers/origin-maintenance.mjs','peers/origin-mechanical-qa-policy.mjs','peers/input-frontier-maintenance.mjs','peers/origin-frontier-seal.mjs','peers/owner-handover.mjs','peers/protected-codex-domain.mjs','peers/codex-task-host.mjs','peers/scheduler.mjs','peers/origin-ordinary-task-contract.mjs','peers/origin-ordinary-task-transition.mjs','peers/origin-ordinary-task.mjs','peers/origin-ordinary-task-instruction.mjs','peers/origin-ordinary-task-readonly3-contract-v1.json','peers/origin-maintenance-authority.mjs','peers/owner-operating-state.mjs','peers/owner-transfer-intent.mjs','peers/origin-paused-bootstrap-accounting.mjs','peers/input-frontier-checkpoint.mjs','peers/origin-plan.mjs','peer-origin-runtime.mjs','peer-owner-runtime.mjs','peers/origin-maintenance-wire.mjs','peers/origin-maintenance-host.mjs','peers/maintenance-launch.mjs','peers/protected-context-channel.mjs','peers/protected-source-build-slot.mjs','peers/policy-supervisor.mjs','peers/context-component-deployment.mjs','operating-state.mjs','handover.mjs','scoped-context.mjs','runtime-execution-shapes.mjs','development-review-continuation.mjs','development-retention-repair.mjs','specialists.mjs','prototype.mjs','retention-primary-transport.mjs','development-delivery.mjs','context-qualification.mjs','notice-sources.mjs','legacy-operating.mjs','corpus-structure.mjs','upgrade-evidence.mjs']);
 const LEGACY_UNIT='legacy-standalone-assignment',PEER_UNIT='new-origin-maintenance-model-invocation';
 const terminal=status=>['completed','failed','cancelled','interrupted','quarantined'].includes(status);
 const ORIGIN='original-local-execution-origin-v1',ASSIGNMENT='original-local-execution-assignment-v1',JOURNAL='original-local-execution-journal-v1';
@@ -185,6 +185,10 @@ function originalFacts(history){
 export function inspectOriginalLocalExecutionInventoryFrom(actualDb){const loan=originalStoreExecutionCustodyFrom(actualDb);return check(loan,()=>originalFacts(originalHistory(loan)));}
 
 const writes=new WeakMap(),launchTokens=new WeakMap();
+// Direct-child observations stay private after a token is consumed. Ordinary
+// callback DATA cannot manufacture the physical model-call completion proof.
+const ordinaryModelObservations=new WeakMap();
+const originalLaunchChildren=new WeakMap();
 const failedLaunches=new WeakMap();
 function originalChildErrorSinks(child){
   const emitters=new Set([child,child.stdin,child.stdout,child.stderr,...(Array.isArray(child.stdio)?child.stdio:[])]),owned=[],onError=()=>{};
@@ -368,19 +372,58 @@ export function spawnOriginalWorkerLaunch(token,command,args,options={}){
     if(r.mechanical_qa!==null){const current=mechanicalQaLaunchAuthority(r.store,state,job,r.mechanical_qa);r.deadline_at_ms=Math.min(r.deadline_at_ms,current.deadline_at_ms);const history=originalHistory(w.loan);need(same(history.jobs[r.job_id],job)&&same(history.origin,r.origin),'LAUNCH_CHANGED');}
     w.launch_cutoff=r.deadline_at_ms;
     finalLaunchCutoff(r);
-    child=spawn(command,args,options);need(child&&typeof child.once==='function','ORIGINAL_CHILD_REQUIRED');originalChildErrorSinks(child);
+    child=spawn(command,args,options);need(child&&typeof child.once==='function','ORIGINAL_CHILD_REQUIRED');
+    originalLaunchChildren.set(token,child);
+    const physical=r.launch.kind==='model'?{child,host:r.host,controller_pid:process.pid,command_sha256:hash(command),argv_sha256:hash(JSON.stringify(args)),cwd_sha256:hash(path.resolve(options.cwd??process.cwd())),pid:positive(child.pid)?child.pid:null,requested_at_ms:Date.parse(r.launch.requested_at),closed:null}:null;
+    if(physical)ordinaryModelObservations.set(token,physical);
+    originalChildErrorSinks(child);
     // Own the original emitter before any remaining physical write/COMMIT can
     // fail. The handle survives on the thrown error for exact-child cleanup;
     // no PID reacquisition, refund or retry is inferred.
     let erroredBeforeBirth=false;
     const onError=()=>{if(!started)erroredBeforeBirth=true;};
     const persistBirth=()=>{if(birth!==null&&!birthDurable)try{observe(r,'birth',birth);birthDurable=true;}catch{/* UNKNOWN retained */}};
-    const onSpawn=()=>{if(!started&&positive(child.pid)){started=true;birth=birthFor(command,args,options,child.pid);}persistBirth();};
+    const onSpawn=()=>{if(!started&&positive(child.pid)){started=true;birth=birthFor(command,args,options,child.pid);}if(physical&&positive(child.pid))physical.pid=child.pid;persistBirth();};
     const onExit=()=>{exited=true;};child.on('error',onError);child.once('spawn',onSpawn);child.once('exit',onExit);
-    child.once('close',(code,signal)=>{closed=true;child.removeListener('error',onError);child.removeListener('spawn',onSpawn);child.removeListener('exit',onExit);if(!started&&!erroredBeforeBirth)return;persistBirth();const value={protocol:'original-local-child-close-v1',launch_id:r.launch.launch_id,pid:birth?.pid??null,code:code??null,signal:signal??null,never_started:!started&&erroredBeforeBirth,observed_at:time()};try{observe(r,'closure',value);}catch{/* UNKNOWN retained */}});
+    child.once('close',(code,signal)=>{closed=true;if(physical)physical.closed={at_ms:Date.now(),code:Number.isInteger(code)?code:null,signal:typeof signal==='string'?signal:null};child.removeListener('error',onError);child.removeListener('spawn',onSpawn);child.removeListener('exit',onExit);if(!started&&!erroredBeforeBirth)return;persistBirth();const value={protocol:'original-local-child-close-v1',launch_id:r.launch.launch_id,pid:birth?.pid??null,code:code??null,signal:signal??null,never_started:!started&&erroredBeforeBirth,observed_at:time()};try{observe(r,'closure',value);}catch{/* UNKNOWN retained */}});
     if(positive(child.pid)){birth=birthFor(command,args,options,child.pid);l.birth=copy(birth);started=true;approve(w,job);}return state;
   });birthDurable=birth!==null;}catch(error){r.invalid=true;rememberModelFailure(error,child,()=>closed,()=>exited);throw error;}
   return child;
+}
+
+// Read the already-consumed token's retained minimum for this exact actual
+// child. This is a timer bound, never another launch permission or issuer.
+export function inspectOriginalWorkerLaunchDeadlineFrom(token,child){
+  const r=launchTokens.get(token);
+  need(r&&r.committed&&r.consumed&&!r.invalid&&r.launch.controller_pid===process.pid&&originalLaunchChildren.get(token)===child&&child!==undefined,'PRIVATE_CHILD_DEADLINE_REQUIRED');
+  return finiteCutoff(r.deadline_at_ms);
+}
+
+export function assertOriginalOrdinaryModelBirthObservedFrom(token,birth){
+  const r=launchTokens.get(token),physical=ordinaryModelObservations.get(token);
+  need(r&&r.launch.kind==='model'&&r.committed&&r.consumed&&physical&&physical.child&&positive(physical.pid),'MODEL_PHYSICAL_BIRTH_REQUIRED');
+  need(closed(birth,['protocol','launch_id','host','pid','worker_pid','spawned_at','command_sha256','argv_sha256','cwd_sha256'])&&birth.protocol==='ordinary-model-process-birth-v1'&&text(birth.launch_id)&&birth.host===physical.host&&birth.pid===physical.pid&&birth.worker_pid===physical.controller_pid&&birth.command_sha256===physical.command_sha256&&birth.argv_sha256===physical.argv_sha256&&birth.cwd_sha256===physical.cwd_sha256,'MODEL_PHYSICAL_BIRTH_REQUIRED');
+  const born=Date.parse(birth.spawned_at);
+  need(Number.isSafeInteger(born)&&born>=physical.requested_at_ms&&born<=Date.now(),'MODEL_PHYSICAL_BIRTH_REQUIRED');
+  return true;
+}
+export function assertOriginalOrdinaryModelClosureObservedFrom(token,birth,receipt){
+  assertOriginalOrdinaryModelBirthObservedFrom(token,birth);
+  const physical=ordinaryModelObservations.get(token),born=Date.parse(birth.spawned_at),ended=Date.parse(receipt?.closed_at);
+  need(physical.closed&&born<=physical.closed.at_ms&&closed(receipt,['protocol','birth_sha256','closed_at','exit_code','signal','observation'])&&receipt.protocol==='ordinary-model-process-close-v1'&&receipt.birth_sha256===hash(JSON.stringify(birth))&&Number.isSafeInteger(ended)&&ended>=born&&ended<=Date.now()&&receipt.exit_code===physical.closed.code&&receipt.signal===physical.closed.signal&&receipt.observation==='original-child-close','MODEL_PHYSICAL_CLOSURE_REQUIRED');
+  return true;
+}
+export function assertOriginalOrdinaryModelObservedFrom(token,birth,receipt){
+  assertOriginalOrdinaryModelClosureObservedFrom(token,birth,receipt);
+  const r=launchTokens.get(token),physical=ordinaryModelObservations.get(token);
+  need(!r.invalid,'MODEL_PHYSICAL_CLOSURE_REQUIRED');
+  need(r.origin.source_generation_sha256===generation(),'SOURCE_GENERATION_CHANGED');
+  need(!r.store.closed,'STORE_EXPIRED');
+  r.store.readSnapshot(()=>{
+    const history=originalHistory(originalStoreExecutionCustodyFrom(r.store)),job=history.jobs[r.job_id],launch=job?.original_execution_assignment?.launches.find(x=>x.launch_id===r.launch.launch_id),entry=job?.model_process_tracking?.invocations?.find(x=>x.invocation_id===r.launch.invocation_id);
+    need(job&&job.instance_id===r.instance_id&&same(history.origin,r.origin)&&launch?.birth?.pid===physical.pid&&launch.birth.command_sha256===physical.command_sha256&&launch.birth.argv_sha256===physical.argv_sha256&&launch.birth.cwd_sha256===physical.cwd_sha256&&launch.closure?.pid===physical.pid&&launch.closure.never_started===false&&launch.closure.code===physical.closed.code&&launch.closure.signal===physical.closed.signal&&entry&&same(entry.birth,birth)&&same(entry.closure,receipt),'MODEL_PHYSICAL_RECORD_REQUIRED');
+  });
+  return true;
 }
 
 const ref=row=>({family:row.family,id:row.id,revision:row.revision,sha256:row.sha256});

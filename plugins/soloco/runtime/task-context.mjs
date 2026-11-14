@@ -5,6 +5,7 @@ import {digest,owner,upgradePending} from './store.mjs';
 import {recordReference,contextSource,currentRecords,currentExtensions,reviewedContext,mandatoryExecutionEvidence,currentExecutionEvidence,proofJobSafe,projectedNoticeContext} from './current-state.mjs';
 import {hasSnapshotReferences,inheritSnapshots} from './snapshot.mjs';
 import {inheritOriginalWorkerAssignmentBookkeepingFrom} from './peers/prospective-local-worker-inventory-producer.mjs';
+import {inheritRuntimeBookkeepingFrom} from './runtime-execution.mjs';
 import {validateTaskRecord,isTaskBookkeeping,isTaskScopedMessage,isTaskOutput,isTaskOwnOutput,taskMessageInput,taskDefinitionHash,taskContextFormat,PRESERVED_NOTICE_TASK_CONTEXT} from './tasks.mjs';
 import {runtimeControlBinding,isRuntimeBookkeeping} from './task-runtime-authority.mjs';
 import {bindCoordination} from './coordination.mjs';
@@ -213,6 +214,7 @@ function assignmentPacket(state,job,record){
   // published outputs are excluded as outputs, never as new input authority.
   const noticeState=inheritSnapshots(state,{...state,notices:(state.notices??[]).filter(n=>job.id===null||n.job_id!==job.id)});
   inheritOriginalWorkerAssignmentBookkeepingFrom(state,noticeState);
+  inheritRuntimeBookkeepingFrom(state,noticeState);
   const inputState=taskContextFormat(task.spec)===8?noticeState:state;
   const source=requiredSources(inputState,job),extensions=currentExtensions(inputState);
   if(hasSnapshotReferences(extensions))fail('unknown referenced state extension requires qualification');
@@ -353,6 +355,7 @@ export function taskContextMatches(state,job,hash,options){
     const current=state.jobs?.[job.id]??job;
     const view=inheritSnapshots(state,{...state,notices:(state.notices??[]).filter(n=>n.job_id!==job.id),messages:(state.messages??[]).filter(m=>m.job_id!==job.id)});
     inheritOriginalWorkerAssignmentBookkeepingFrom(state,view);
+    inheritRuntimeBookkeepingFrom(state,view);
     return taskAssignmentContext(view,current,options).hash===hash;
   }catch{return false;}
 }

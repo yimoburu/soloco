@@ -99,7 +99,7 @@ function harness(host='claude') {
   let readinessCalls=0;
   // Conditional VM boundaries only: these sentinels are not canonical producer
   // capabilities and establish no Original inventory or process qualification.
-  const vmLaunches=new WeakMap();
+  const vmLaunches=new WeakMap(),vmRuntimeLaunches=new WeakMap();
   const requireText=(value,label,max=20000)=>{
     if(typeof value!=='string'||!value.trim()||value.length>max)throw new Error('Invalid '+label);
     return value;
@@ -112,7 +112,7 @@ function harness(host='claude') {
     digest:()=> 'binding',folder:value=>value,noLink:()=>{},requireText,
     withStore:(root,fn)=>{
       assert.equal(root,'/fixture');
-      return fn({read:()=>structuredClone(state),transaction:(type,change)=>{
+      return fn({root,read:()=>structuredClone(state),transaction:(type,change)=>{
         const next=change(structuredClone(state));
         state=structuredClone(next);
         transactions.push(type);
@@ -143,8 +143,25 @@ function harness(host='claude') {
     normalizeTimeout:({timeout_ms,timeout_reason})=>({timeout_ms:timeout_ms??180000,timeout_reason:timeout_reason??'Fixture default'}),normalizeHandoverReviewWindow,normalizeCodeReviewWindow,
     jobTimeoutState:()=>({state:'terminal'}),
     recordOriginalWorkerAssignmentFrom:(_store,_state,job)=>job,
-    prepareOriginalWorkerLaunchFrom:(_store,_state,input)=>{const token=Object.freeze({SYNTHETIC_VM_ONLY:true});vmLaunches.set(token,{kind:input.kind,used:false});return token;},
+    prepareOriginalWorkerLaunchFrom:(_store,_state,input)=>{const token=Object.freeze(Object.create(null));vmLaunches.set(token,{kind:input.kind,used:false});return token;},
     spawnOriginalWorkerLaunch:(token,...args)=>{const launch=vmLaunches.get(token);assert.ok(launch&&!launch.used&&launch.kind==='worker');launch.used=true;return deps.spawn(...args);},
+    // These APIs replace the whole runtime boundary ONLY in this VM. They
+    // neither classify physical storage nor issue actual runtime/Original
+    // custody. No production consumer receives these private sentinels.
+    recordRuntimeWorkerAssignmentFrom:(_store,_state,job)=>job,
+    prepareRuntimeWorkerLaunchFrom:(store,current,input)=>{
+      assert.equal(store.root,'/fixture');assert.equal(input.kind,'worker');assert.ok(current.jobs[input.job_id]);
+      const token=Object.freeze(Object.create(null));
+      vmRuntimeLaunches.set(token,{kind:input.kind,used:false,root:store.root,job_id:input.job_id});return token;
+    },
+    spawnRuntimeWorkerLaunch:token=>{
+      const launch=vmRuntimeLaunches.get(token);assert.ok(launch&&!launch.used&&launch.kind==='worker'&&launch.root==='/fixture');launch.used=true;
+      return deps.spawn(deps.process.execPath,['--no-warnings',path.join(deps.PACKAGE,'runtime/worker.mjs'),launch.root,launch.job_id],{detached:true,stdio:'ignore',env:{...deps.process.env,COMPANY_WORKER:'1'}});
+    },
+    cleanupLegacyRuntimeLaunchFailure:()=>false,cleanupOriginalWorkerLaunchFailure:()=>false,
+    runtimeJobOccupied:job=>{
+      assert.equal(Object.hasOwn(job,'legacy_runtime'),false,'Selection VM does not mint guarded runtime history');return false;
+    },
     spawn:(...args)=>{launches.push(args);return {on:()=>{},unref:()=>{}};},
     // This VM supplies a synthetic legacy Store; peer routing/storage behavior
     // is covered by the actual SQLite and root-ingress suites.

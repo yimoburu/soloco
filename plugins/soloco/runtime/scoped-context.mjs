@@ -466,7 +466,7 @@ function corpusLive(s,c,m){
   const known=new Set(m.sources.map(r=>r.source.id)),operating=operatingProofOccurrences(s),proposed=proposedBootstrapHomes(s,c,m);
   for(const r of proposed)if(operating.ids.has(r.id))fail('typed proposed home cannot be proof bookkeeping');
   for(const [id,r] of Object.entries(s.records??{}))if(!known.has(id)&&!proposed.some(h=>h.id===id)&&!operating.ids.has(id)&&!corpusRuntimeRecord(s,r))fail('corpus current membership added '+id);
-  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&!operating.jobs.has(id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))))))fail('corpus current job membership added '+id);
+  for(const [id,j] of Object.entries(s.jobs??{}))if(!known.has('job:'+id)&&!operating.jobs.has(id)&&(!s.records[j.review_of?.id]?.scoped_context_target||!proofJobSafe(Object.fromEntries(Object.entries(j).filter(([k])=>!['qualification_delivery','error','execution_failure','rejected_output','rejected_native_ids','rejected_native_id'].includes(k))),s)))fail('corpus current job membership added '+id);
   for(const u of [s.upgrade,...(s.upgrade_history??[])].filter(Boolean))if(!known.has('upgrade:'+u.id))fail('corpus upgrade membership added');
 }
 function captureCorpus(s,{source_id,corpus_plan_id,selected_source_ids,semantic_partition,batching_policy,home_intake_policy,maintenance,source_instruction,frozen_intake}){
