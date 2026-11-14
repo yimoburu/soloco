@@ -935,9 +935,15 @@ link/launch or descendant/remote closure evidence.
 
 The source guards support S018, S028, S056, S058, S084 and S086 without upgrading
 their existing assessment. Complete wire-size checks precede reservations and
-charges. The new active-task route is confined to read-only foundation callbacks;
-general effects still need an independently reviewed task/attempt/context fence
-inside the same P2 write transaction, including replay. Original child exit,
+charges. In this historical bridge scope, active-task callbacks were confined
+to the read-only foundation profile. Later delivered source implements the
+explicit [`task-bound-effects` profile](peer-task-effects.md): own-task reads,
+scoped messages/notices/home proposals, and accept/reject for the exact admitted
+typed handoff. Its task/attempt/context fence binds the original executor and
+checks current authority before replay and again at the owning physical
+precommit guard. The foundation profile remains read-only; these restricted
+actions confer no arbitrary execution, publication, qualified native launch or
+company adoption. Original child exit,
 stream EOF and owned TCP closure remain separate from unknown group absence and
 remote-domain closure. The stronger physical-close gate remains Held.
 
