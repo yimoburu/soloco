@@ -13,12 +13,12 @@ import {actor,ref,code,indexedCreateHash,indexedPreparationLimit,rows,get,seed,s
 
 function seedUnrelatedTerminalHistory(f,total=10001){
   const commandIds=new Set(),at='2020-01-01T00:00:00.000Z';
+  const definition={owner_principal_id:'founder',grant_id:null,grant_generation:null,scope:'archive',host:'codex',role:'engineer',stage:'produce',instructions:'Fictional archived work cancelled before admission.',acceptance:'No execution authorized by this fixture.',resources:[],input_refs:[],review_of:null,parent_task_id:null,parent_ref:null,outcome:null},definitionSha256=digest(definition);
   for(let start=0;start<total;start+=200){
     f.ledger.write('fixture.terminal-history','founder',tx=>{
       for(let i=start;i<Math.min(start+200,total);i++){
         const id=`archive-task-${String(i).padStart(5,'0')}`,operation=`archive-cancel-${i}`;
-        const definition={owner_principal_id:'founder',grant_id:null,grant_generation:null,scope:'archive',host:'codex',role:'engineer',stage:'produce',instructions:'Fictional archived work cancelled before admission.',acceptance:'No execution authorized by this fixture.',resources:[],input_refs:[],review_of:null,parent_task_id:null,parent_ref:null,outcome:null};
-        const planned=tx.put('tasks',id,{...definition,definition,status:'planned',definition_revision:1,definition_sha256:digest(definition),attempt:null,principal_id:'founder',created_at:at},0);
+        const planned=tx.put('tasks',id,{...definition,definition,status:'planned',definition_revision:1,definition_sha256:definitionSha256,attempt:null,principal_id:'founder',created_at:at},0);
         const reason='Archived unstarted cancellation.';
         const cancelled=tx.put('tasks',id,{...planned.value,status:'cancelled',cancelled_at:at,cancellation:reason},planned.revision);
         const commandId=digest(['peer-command-v1','founder',operation]);commandIds.add(commandId);
@@ -120,9 +120,9 @@ test('external indexed scale: 10001 unrelated structural reviews preserve real w
  const proposal=f.propose('cos-a',{home_id:'other',content:'Independently reviewed publication before unrelated history.'}),pass=externalReview(f,proposal,'reviewer');
  const ordinary=f.start('cos-a',{resources:['path:tree1:indexed-before-bulk']}),beforeContext=ordinary.context,usage=get(f,'control','usage');
  assert(!beforeContext.sources.some(r=>r.family==='homes'&&r.id===foreign.home.id));
- for(let offset=0;offset<10001;offset+=25){
+ for(let offset=0;offset<10001;offset+=200){
   const batch=[];
-  for(let i=offset;i<Math.min(10001,offset+25);i++){
+  for(let i=offset;i<Math.min(10001,offset+200);i++){
    const records=indexedStructuralReview(i,ref('proposals',i<5000?u:v));batch.push(records);
    for(const row of records)bulk[row.family].add(row.id);
   }
