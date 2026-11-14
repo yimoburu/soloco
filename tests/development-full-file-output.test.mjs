@@ -6,7 +6,7 @@ import path from 'node:path';
 import {EventEmitter} from 'node:events';
 import {PassThrough} from 'node:stream';
 import {createHash} from 'node:crypto';
-import {assembleFullFileOutput,createFullFileProducer,FULL_FILE_OUTPUT_PROTOCOL} from '../plugins/soloco/runtime/development-full-file-output.mjs';
+import {assembleFullFileOutput,createFullFileProducer,FULL_FILE_OUTPUT_PROTOCOL,FULL_FILE_INPUT_CODEC,prepareFullFileInput,normalizePreparedFullFileResult} from '../plugins/soloco/runtime/development-full-file-output.mjs';
 import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {withStore,id} from '../plugins/soloco/runtime/store.mjs';
@@ -139,6 +139,86 @@ test('actual unchanged runModel parser waits for owned close; no CLI is launched
  const raw=wire([{path:'a.mjs',content:'full emitted body'}]);let child,settled=false;const events=[];const model=createFullFileProducer({binding:binding(['a.mjs']),record:e=>{events.push(e);}});
  const pending=model('codex',null,'complete canonical task','/controlled',10000,null,{timeoutReason:'Controlled actual adapter timing fixture.',resolveExecutable:()=>'/controlled/not-executed',spawn(){child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.stdin={end(){queueMicrotask(()=>{child.emit('spawn');for(const e of [{type:'thread.started',thread_id:'controlled-native'},{type:'turn.started'},{type:'item.completed',item:{type:'agent_message',id:'final',phase:'final_answer',text:raw}},{type:'turn.completed'}])child.stdout.write(JSON.stringify(e)+'\n');});},on(){},removeListener(){}};child.kill=()=>true;return child;}}).then(x=>{settled=true;return x;});
  await new Promise(r=>setImmediate(r));assert.equal(settled,false);assert(!events.some(x=>x.stage==='response'));child.emit('close',0);const out=await pending;assert.equal(out.model_evidence.full_file_output.invoke_kind,'existing_runModel');assert.equal(events[2].original_model_text,raw);
+});
+
+// Pure factoring controls add no filesystem, clock, recorder or model seam.
+const assertFrozenData=value=>{
+ if(!value||typeof value!=='object'){assert.notEqual(typeof value,'function');return;}
+ assert.equal(Object.getPrototypeOf(value),Array.isArray(value)?Array.prototype:Object.prototype);
+ assert(Object.isFrozen(value));for(const d of Object.values(Object.getOwnPropertyDescriptors(value))){assert(Object.hasOwn(d,'value'));assertFrozenData(d.value);}
+};
+test('pure preparation is deterministic frozen DATA with exact fixed instruction and prompt measurements',()=>{
+ const input={canonical_prompt:'CANONICAL: \uFEFF雪😀\r\n',binding:binding(['empty.txt','b.mjs','a.mjs']),limits:{}},original=copy(input);
+ const prepared=prepareFullFileInput(input);assert.deepEqual(prepared,prepareFullFileInput(copy(input)));assert.deepEqual(input,original);assertFrozenData(prepared);
+ assert.deepEqual(prepared.binding.write_paths,['a.mjs','b.mjs','empty.txt']);assert.equal(prepared.protocol,FULL_FILE_OUTPUT_PROTOCOL);assert.equal(prepared.codec.id,FULL_FILE_INPUT_CODEC);
+ // Independent frozen4f849 builder/render commitments, not a new encoder oracle.
+ assert.equal(prepared.codec.instruction_builder_sha256,'ab903785b16cf4db540f893516429ca137326e301e1d7e05ccdea07f634d04cb');
+ assert.equal(prepared.encoding_instruction_metrics.sha256,'4d6fd6e9e1b7ca2b91d0223ab08b9f9bf491ad4f1cb34cba6795815f40257f88');assert.equal(prepared.encoding_instruction_metrics.utf8_bytes,1324);
+ assert.equal(prepared.actual_prompt,prepared.canonical_prompt+prepared.encoding_instruction);
+ for(const [text,metrics]of [[prepared.canonical_prompt,prepared.canonical_prompt_metrics],[prepared.encoding_instruction,prepared.encoding_instruction_metrics],[prepared.actual_prompt,prepared.actual_prompt_metrics]])assert.deepEqual(metrics,{sha256:hash(text),utf8_bytes:Buffer.byteLength(text),utf16_characters:text.length});
+ input.binding.write_paths.push('later.mjs');input.limits.prompt_bytes=1;assert.deepEqual(prepared.binding.write_paths,['a.mjs','b.mjs','empty.txt']);assert.equal(Object.hasOwn(prepared,'capability'),false);
+});
+test('pure preparation rejects callbacks accessors cycles and non-DATA without invoking supplied code',()=>{
+ let calls=0;const getter={binding:binding(['a.mjs'])};Object.defineProperty(getter,'canonical_prompt',{enumerable:true,get(){calls++;return 'source';}});
+ assert.throws(()=>prepareFullFileInput(getter),code('FULL_FILE_DATA'));assert.equal(calls,0);
+ const callback=()=>{calls++;return 1;};assert.throws(()=>prepareFullFileInput({canonical_prompt:'source',binding:binding(['a.mjs']),limits:{chunk_bytes:callback}}),code('FULL_FILE_DATA'));assert.equal(calls,0);
+ const cyclic={canonical_prompt:'source',binding:binding(['a.mjs'])};cyclic.binding.loop=cyclic;assert.throws(()=>prepareFullFileInput(cyclic),code('FULL_FILE_DATA'));
+ assert.throws(()=>prepareFullFileInput({canonical_prompt:'source',binding:binding(['a.mjs']),limits:new Date(0)}),code('FULL_FILE_DATA'));
+ assert.throws(()=>prepareFullFileInput({canonical_prompt:'source',binding:binding(['a.mjs']),limits:null}),code('FULL_FILE_SHAPE'));
+});
+test('pure preparation enforces exact UTF8 UTF16 prompt boundaries and invalid input guards',()=>{
+ const input={canonical_prompt:'雪😀\r\n',binding:binding(['a.mjs'])},prepared=prepareFullFileInput(input),b=prepared.actual_prompt_metrics.utf8_bytes,n=prepared.actual_prompt_metrics.utf16_characters;assert(b>n);
+ assert.equal(prepareFullFileInput({...input,limits:{prompt_bytes:b,prompt_characters:n}}).actual_prompt,prepared.actual_prompt);
+ assert.throws(()=>prepareFullFileInput({...input,limits:{prompt_bytes:b-1,prompt_characters:n}}),code('FULL_FILE_PROMPT_LIMIT'));
+ assert.throws(()=>prepareFullFileInput({...input,limits:{prompt_bytes:b,prompt_characters:n-1}}),code('FULL_FILE_PROMPT_LIMIT'));
+ for(const canonical_prompt of ['bad\0source','\ud83d'])assert.throws(()=>prepareFullFileInput({...input,canonical_prompt}),code('FULL_FILE_REQUEST'));
+ assert.throws(()=>prepareFullFileInput({...input,callback:()=>{throw Error('Not called');}}),code('FULL_FILE_DATA'));
+ assert.throws(()=>prepareFullFileInput({...input,binding:{...input.binding,write_paths:['../outside']}}),code('FULL_FILE_PATHS'));
+});
+test('pure normalization recomputes every prepared join and never treats frozen DATA as authority',()=>{
+ const prepared=prepareFullFileInput({canonical_prompt:'complete source',binding:binding(files.map(f=>f.path))}),raw=wire(files),normalized=normalizePreparedFullFileResult(prepared,raw);assert.equal(normalized.status,'ASSEMBLED');assert.deepEqual(normalized.artifact.files,files);assertFrozenData(normalized);
+ const reordered=Object.fromEntries(Object.entries(copy(prepared)).reverse());assert.deepEqual(normalizePreparedFullFileResult(reordered,raw),normalized);
+ for(const mutate of [p=>p.actual_prompt+='x',p=>p.canonical_prompt_metrics.sha256='0'.repeat(64),p=>p.encoding_instruction+='x',p=>p.codec.instruction_builder_sha256='0'.repeat(64),p=>p.binding.write_paths=['changed.mjs']]){
+  const forged=copy(prepared);mutate(forged);Object.freeze(forged);assert.throws(()=>normalizePreparedFullFileResult(forged,raw),code('FULL_FILE_PREPARED'));
+ }
+ // A caller can recompute consistent different labels. The pure result still
+ // supplies no Store/current-subject/issuer decision or launch capability.
+ const other=prepareFullFileInput({canonical_prompt:'complete source',binding:{...binding(files.map(f=>f.path)),job_id:'different-untrusted-label'}});assert.deepEqual(normalizePreparedFullFileResult(other,raw),normalized);
+ let reads=0;const accessor={...prepared};Object.defineProperty(accessor,'actual_prompt',{enumerable:true,get(){reads++;return prepared.actual_prompt;}});assert.throws(()=>normalizePreparedFullFileResult(accessor,raw),code('FULL_FILE_DATA'));assert.equal(reads,0);
+});
+test('pure normalization preserves original one and three module bytes and exposes unchanged-byte corruption',()=>{
+ for(const count of [1,3]){
+  const data=originalFixture(count),pins=originalControlPins[count];assert.equal(hash(JSON.stringify(data)),pins.fixture_sha256);
+  const prepared=prepareFullFileInput({canonical_prompt:'Exact original fixed source and task',binding:binding(data.expected.map(f=>f.path))}),result=normalizePreparedFullFileResult(prepared,wire(data.expected));
+  const complete=[...result.artifact.files,data.test].sort((a,b)=>a.path.localeCompare(b.path));assert.equal(Buffer.byteLength(JSON.stringify(complete)),pins.candidate_bytes);assert.equal(hash(JSON.stringify(complete)),pins.candidate_sha256);
+  const corrupt=copy(data.expected);corrupt[0].content=corrupt[0].content.replace('fixed fictional','Fixed fictional');const raw=wire(corrupt),bad=normalizePreparedFullFileResult(prepared,raw);
+  assert.deepEqual(bad.artifact.files,corrupt);assert.notEqual(hash(JSON.stringify([...bad.artifact.files,data.test].sort((a,b)=>a.path.localeCompare(b.path)))),pins.candidate_sha256);assert.equal(bad.accounting.wire_sha256,hash(raw));assert.equal(bad.accounting.semantic_full_byte_fidelity,'UNVERIFIED_REQUIRES_TASK_TESTS_AND_INDEPENDENT_QA');
+ }
+});
+test('pure normalization preserves honest Blocked raw DATA without fabricated files or acceptance',()=>{
+ const prepared=prepareFullFileInput({canonical_prompt:'source',binding:binding(['a.mjs'])}),raw=JSON.stringify({content:'Cannot preserve unchanged bytes',messages:[],notices:[],blocked:'Held; no additional call'}),result=normalizePreparedFullFileResult(prepared,raw);
+ assert.equal(result.status,'PRODUCER_BLOCKED');assert.equal(result.original_output_text,raw);assert.deepEqual(result.artifact,JSON.parse(raw));assert.equal(Object.hasOwn(result.artifact,'files'),false);assertFrozenData(result);
+ assert.deepEqual(result.accounting,{wire_utf8_bytes:Buffer.byteLength(raw),wire_utf16_characters:raw.length,wire_sha256:hash(raw)});
+ assert.throws(()=>normalizePreparedFullFileResult(prepared,raw.replace('{"content":','{"content":"hidden","content":')),code('FULL_FILE_DUPLICATE_KEY'));
+ assert.throws(()=>normalizePreparedFullFileResult(prepared,JSON.stringify({...JSON.parse(raw),files:[]})),code('FULL_FILE_SHAPE'));
+});
+test('pure normalization retains wire frame path Unicode and serialized-output rejection boundaries',()=>{
+ const input={canonical_prompt:'source',binding:binding(['a.mjs'])},raw=wire([{path:'a.mjs',content:'雪😀\r\n'}]),prepared=prepareFullFileInput(input),size=Buffer.byteLength(raw);
+ assert.equal(normalizePreparedFullFileResult(prepareFullFileInput({...input,limits:{wire_bytes:size}}),raw).accounting.wire_utf8_bytes,size);
+ assert.throws(()=>normalizePreparedFullFileResult(prepareFullFileInput({...input,limits:{wire_bytes:size-1}}),raw),code('FULL_FILE_WIRE_LIMIT'));
+ assert.throws(()=>normalizePreparedFullFileResult(prepareFullFileInput({...input,limits:{chunk_bytes:1}}),raw),code('FULL_FILE_BODY_LIMIT'));
+ assert.throws(()=>normalizePreparedFullFileResult(prepareFullFileInput({...input,limits:{frames:1}}),raw),code('FULL_FILE_FRAMES'));
+ assert.throws(()=>normalizePreparedFullFileResult(prepared,raw.slice(0,-1)),code('FULL_FILE_JSON'));
+ assert.throws(()=>normalizePreparedFullFileResult(prepared,mutate(raw,f=>{f[0].path='../outside';})),code('FULL_FILE_FILE_ORDER'));
+ assert.throws(()=>normalizePreparedFullFileResult(prepared,mutate(raw,f=>{f[1].seq=0;})),code('FULL_FILE_SEQUENCE'));
+ for(const text of ['\0','\ud83d'])assert.throws(()=>normalizePreparedFullFileResult(prepared,wire([{path:'a.mjs',content:text}])),code('FULL_FILE_UNICODE'));
+ const tiny=prepareFullFileInput({...input,binding:{...input.binding,max_bytes:1000}});assert.throws(()=>normalizePreparedFullFileResult(tiny,wire([{path:'a.mjs',content:'x'.repeat(2000)}])),code('FULL_FILE_WIRE_LIMIT'));
+});
+test('opt-in wrapper composes the pure codec with unchanged request raw-retention and output behavior',async()=>{
+ const canonical='Canonical source/task \uFEFF雪😀\r\n',bound=binding(files.map(f=>f.path)),prepared=prepareFullFileInput({canonical_prompt:canonical,binding:bound}),raw=wire(files),events=[];let calls=0;
+ const model=createFullFileProducer({binding:bound,record:e=>{events.push(e);},invoke:async(...args)=>{calls++;assert.equal(args[2],prepared.actual_prompt);return invokeText(raw)(...args);}});
+ const out=await model('codex',null,canonical,'/controlled',10000,null,{}),pure=normalizePreparedFullFileResult(prepared,raw);assert.equal(calls,1);assert.equal(out.text,JSON.stringify(pure.artifact));assert.deepEqual(events.map(e=>e.stage),['request','spawn','response','assembled']);assert.equal(events[2].original_model_text,raw);
+ assert.equal(events[0].canonical_prompt_sha256,prepared.canonical_prompt_metrics.sha256);assert.equal(events[0].actual_prompt_sha256,prepared.actual_prompt_metrics.sha256);assert.equal(events[0].actual_prompt_utf8_bytes,prepared.actual_prompt_metrics.utf8_bytes);assert.equal(events[0].actual_prompt_utf16_characters,prepared.actual_prompt_metrics.utf16_characters);assert.equal(out.model_evidence.full_file_output.files_sha256,pure.accounting.files_sha256);
 });
 
 const base=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-full-file-output-'));process.env.COMPANY_PLUGIN_DATA=path.join(base,'fictional-plugin-data');test.after(()=>fs.rmSync(base,{recursive:true,force:true}));
