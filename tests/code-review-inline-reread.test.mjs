@@ -19,19 +19,20 @@ test.after(()=>{if(priorData===undefined)delete process.env.COMPANY_PLUGIN_DATA;
 const reason='Controlled optional re-delivery of exact initial code-review inputs.';
 
 async function exercise({inlineID='candidate',mode='success'}={}){
-  const a=fixture();
+  const RealDate=Date;let clock=RealDate.now()+1000,calls=0,sawInitial=false;
+  const children=[],delivered=[],limits=[];
+  globalThis.Date=class extends RealDate{constructor(...v){super(...(v.length?v:[clock]));}static now(){return clock;}};
+  try{
+  const a=await fixture();clock=a.reviewStart;
+  assert(Date.now()>Date.parse(read(a).records.plan.development.scope.expires_at));
   change(a,s=>{s.records['not-supplied']={id:'not-supplied',revision:1,kind:'artifact',content:'This unrelated controlled record is not assignment evidence.'};});
   const target=authorized(a),before=read(a),required=reviewContinuationRequiredEvidence(before,target,{root:a.root});
   engine.bind(a.root,a.session_id,'codex');
   const q=engine.dispatch({...a,role:'qa',task:'Independently review every supplied whole source. Optional exact reread does not renew any allowance.',review_of:target.id,input_ids:required.filter(r=>r.id!=='contract').map(r=>r.id),evidence_ids:['contract'],timeout_ms:600000,timeout_reason:reason,code_review_window_minutes:30,code_review_reason:reason},'codex',{check:()=>({available:true,authenticated:true,version:'controlled-no-CLI'}),launch:()=>({on(){},unref(){}})});
   stageOriginalWorker(a.root,q.id);
-  const RealDate=Date;let clock=RealDate.now()+1000,calls=0,sawInitial=false;
-  const children=[],delivered=[],limits=[];
-  globalThis.Date=class extends RealDate{constructor(...v){super(...(v.length?v:[clock]));}static now(){return clock;}};
   const inline=before.records[inlineID],inlineText=JSON.stringify(inline);
   const source=mode==='unlisted'?before.records['not-supplied']:inline;
   const request={id:source.id,sha256:mode==='wrong-hash'?'0'.repeat(64):hash(source),offset:0,length:mode==='oversize-range'?32769:JSON.stringify(source).length};
-  try{
     await work(a.root,q.id,(host,native,prompt,cwd,limit,selection,options)=>{
       calls++;limits.push(limit);
       if(calls===1){

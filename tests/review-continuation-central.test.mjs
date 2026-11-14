@@ -15,13 +15,15 @@ const priorData=process.env.COMPANY_PLUGIN_DATA;process.env.COMPANY_PLUGIN_DATA=
 test.after(()=>{if(priorData===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=priorData;});
 const reason='CONTROLLED source fixture: one exact new read-only independent judgment.';
 async function central({latePersistence=false}={}){
-  const a=fixture(),target=authorized(a),before=read(a),required=reviewContinuationRequiredEvidence(before,target,{root:a.root});engine.bind(a.root,a.session_id,'codex');
-  const queued=engine.dispatch({...a,role:'qa',task:'Read every whole required source; return an independent exact continuation verdict.',review_of:target.id,input_ids:required.filter(x=>x.id!=='contract').map(x=>x.id),evidence_ids:['contract'],timeout_ms:600000,timeout_reason:reason,code_review_window_minutes:30,code_review_reason:reason},'codex',{check:()=>({available:true,authenticated:true,version:'controlled-no-CLI'}),launch:()=>({on(){},unref(){}})});
-  stageOriginalWorker(a.root,queued.id);
   const RealDate=Date,originalTransaction=Store.prototype.transaction;let clock=RealDate.now()+1000,calls=0,sawTransport=false,crossed=false;const children=[];
   globalThis.Date=class extends RealDate{constructor(...v){super(...(v.length?v:[clock]));}static now(){return clock;}};
-  if(latePersistence)Store.prototype.transaction=function(type,fn,options={}){return originalTransaction.call(this,type,fn,type==='job.completed'?{...options,afterWrite(db,state){options.afterWrite?.(db,state);clock=Date.parse(state.jobs[queued.id].execution_deadline_at);crossed=true;}}:options);};
   try{
+  const a=await fixture();clock=a.reviewStart;
+  assert(Date.now()>Date.parse(read(a).records.plan.development.scope.expires_at));
+  const target=authorized(a),before=read(a),required=reviewContinuationRequiredEvidence(before,target,{root:a.root});engine.bind(a.root,a.session_id,'codex');
+  const queued=engine.dispatch({...a,role:'qa',task:'Read every whole required source; return an independent exact continuation verdict.',review_of:target.id,input_ids:required.filter(x=>x.id!=='contract').map(x=>x.id),evidence_ids:['contract'],timeout_ms:600000,timeout_reason:reason,code_review_window_minutes:30,code_review_reason:reason},'codex',{check:()=>({available:true,authenticated:true,version:'controlled-no-CLI'}),launch:()=>({on(){},unref(){}})});
+  stageOriginalWorker(a.root,queued.id);
+  if(latePersistence)Store.prototype.transaction=function(type,fn,options={}){return originalTransaction.call(this,type,fn,type==='job.completed'?{...options,afterWrite(db,state){options.afterWrite?.(db,state);clock=Date.parse(state.jobs[queued.id].execution_deadline_at);crossed=true;}}:options);};
     await work(a.root,queued.id,(host,native,prompt,cwd,limit,selection,options)=>{
       calls++;
       if(calls===1){

@@ -19,7 +19,7 @@ process.env.COMPANY_PLUGIN_DATA=registry;
 test.after(()=>{if(priorData===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=priorData;fs.rmSync(registry,{recursive:true,force:true});});
 const reason='Controlled private source test of one exact evidence-retention repair.';
 async function exercise(t,{mode='success'}={}){
- const a=fixture();t.after(a.cleanup);engine.bind(a.root,a.session_id,'codex');const before=read(a);
+ const a=await fixture();t.after(a.cleanup);engine.bind(a.root,a.session_id,'codex');const before=read(a);
  const prepared=engine.develop({...a,action:'prepare_retention_review'},'codex');const proposal=prepared.proposal??prepared,proposal_sha256=prepared.proposal_sha256??hash(proposal);assert.deepEqual(read(a),before,'public prepare is read-only');
  const ticket=engine.develop({...a,action:'authorize_retention_review',proposal_sha256,model_data_approved:true,source_instruction:'Controlled already-approved local source repair, exact original expiry and no generation/test/reset.',approval_reference:'controlled-integration-primary'},'codex');
  const allInline=mode.startsWith('all-inline-');

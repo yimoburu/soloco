@@ -1,7 +1,8 @@
 // Extracted exact V2 controlled fixture prefix; only helper-body/output padding added for meaningful alias activation.
-// Controlled source fixtures in REAL temporary Stores. These tests invoke no
-// model, child executor, product company or canonical validation API. The small
-// synthetic historical receipt is test data, never actual P4/326 evidence.
+// Controlled source fixtures in REAL temporary Stores. The supported authorizer
+// may run its fixed cached sandbox readiness probe (5s/10KB); candidate execution
+// and model/provider calls stay controlled. The small synthetic historical
+// receipt is test data, never actual P4/326 evidence or public HOST qualification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,11 +10,12 @@ import os from 'node:os';
 import path from 'node:path';
 import {digest,id,installedTeam,teamHash,VERSION,withStore,Store} from '../plugins/soloco/runtime/store.mjs';
 import {validationManifest} from '../plugins/soloco/runtime/validation-cache.mjs';
-import {developmentReviewAuthority,developmentReviewSubject} from '../plugins/soloco/runtime/develop.mjs';
+import {developmentAction,developmentReviewSubject} from '../plugins/soloco/runtime/develop.mjs';
 import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {prepareReviewContinuation,authorizeReviewContinuation,reviewContinuationSubject,reviewContinuationAssignment,reviewContinuationContextInputs,reviewContinuationCandidate,reviewContinuationRequiredEvidence,validateReviewContinuationPublication,acceptReviewContinuation,developmentReviewContinuationAction} from '../plugins/soloco/runtime/development-review-continuation.mjs';
 import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
 import {stageOriginalHistoricalJob,stageOriginalWorker,disposeOriginalProcessFixtures} from './original-adapter-process-fixture.mjs';
+import {stageOriginalReviewController} from './original-worker-model-fixture.mjs';
 import {TIMEOUT_POLICY_VERSION} from '../plugins/soloco/runtime/timeout.mjs';
 import {codeReviewWindowSubject} from '../plugins/soloco/runtime/code-review-window.mjs';
 
@@ -22,12 +24,17 @@ const originalRoots=[];
 test.after(()=>{for(const root of originalRoots)disposeOriginalProcessFixtures(root);fs.rmSync(base,{recursive:true,force:true});});
 const hash=x=>digest(JSON.stringify(x)),read=a=>withStore(a.root,db=>db.read());
 const change=(a,fn)=>withStore(a.root,db=>db.transaction('controlled.continuation-fixture',s=>{fn(s);return s;}));
-function fixture({recovery=true,legacy=true}={}) {
+async function fixture({recovery=true,legacy=true}={}) {
+  const RealDate=Date,stagingTime=RealDate.now();
+  // The genuine issuers see one coherent initially-live Source clock. No
+  // historical private token is backdated, and no original expiry is renewed.
+  globalThis.Date=class extends RealDate{constructor(...v){super(...(v.length?v:[stagingTime]));}static now(){return stagingTime;}};
+  try{
   const root=fs.realpathSync(fs.mkdtempSync(path.join(base,'case-'))),a={root,session_id:id('owner'),host:'codex',epoch:1},team=installedTeam();
   originalRoots.push(root);
   const originals=[{path:'helper.mjs',content:'export const helper=1;\n'+'// Whole preserved controlled helper body.\n'.repeat(120)},{path:'value.mjs',content:'export const value=0;\n'},{path:'value.test.mjs',content:'// Controlled historical test source, never executed by this fixture.\n'}],files=structuredClone(originals);files[1].content='export const value=42;\n';
   for(const f of originals)fs.writeFileSync(path.join(root,f.path),f.content);
-  const scope={read_paths:originals.map(f=>f.path),write_paths:['value.mjs'],test_paths:['value.test.mjs'],sources:originals.map(f=>({...f,sha256:digest(f.content)})),max_bytes:20000,max_attempts:2,timeout_ms:1000,max_output_bytes:10000,transport_max_characters:360000,expires_at:'2001-01-01T00:00:00.000Z',acceptance:'All scoped controlled code and strong assertions.',stop_conditions:'No execution or integration rights from review.',data_policy:'Synthetic controlled fixtures only.',output_format:'patches'};
+  const scope={read_paths:originals.map(f=>f.path),write_paths:['value.mjs'],test_paths:['value.test.mjs'],sources:originals.map(f=>({...f,sha256:digest(f.content)})),max_bytes:20000,max_attempts:2,timeout_ms:1000,max_output_bytes:10000,transport_max_characters:360000,expires_at:new Date(stagingTime+600000).toISOString(),acceptance:'All scoped controlled code and strong assertions.',stop_conditions:'No execution or integration rights from review.',data_policy:'Synthetic controlled fixtures only.',output_format:'patches'};
   const patch={path:'value.mjs',base_sha256:digest(originals[1].content),edits:[{start:0,end:originals[1].content.length,text:files[1].content}]};
   const p={id:'plan',kind:'artifact',revision:1,status:'Draft',content:'Expired original controlled scope.',development:{type:'plan',scope,scope_sha256:hash(scope),attempts:['old-generation-1','producer']}};
   const producer={id:'producer',role:'engineer',instance_id:'engineer-original',native_id:'native-original',status:'completed',development_id:p.id,artifact_id:'candidate',inputs:[],supplemental_sources:[],coordination_release:{termination_confirmed:true,reason:'model_process_closed'}};
@@ -37,22 +44,22 @@ function fixture({recovery=true,legacy=true}={}) {
   const result={status:'passed',exit_code:0,tests_executed:true,signal:null,output_truncated:false,stdout:'Controlled historical fixture only; no tests executed by fixture construction.'.repeat(80),stderr:'',directory,test_paths:scope.test_paths,timeout_ms:1000,max_output_bytes:10000,validation_manifest_sha256:hash(manifest)};
   const t={id:'receipt',kind:'artifact',revision:1,status:'Submitted',author_role:'runtime',author_instance:'controller',content:JSON.stringify(result),development:{type:'test',plan_id:p.id,candidate_id:c.id,candidate_sha256:c.development.candidate_sha256,result,receipt_sha256:hash(result),validation_manifest:manifest,validation_fingerprint:manifest.validation_fingerprint}};
   const old={id:'old-failed-receipt',kind:'artifact',revision:1,status:'Submitted',author_role:'runtime',author_instance:'old-controller',content:'Controlled original preflight failure',development:{type:'test',receipt_sha256:digest('old-result'),result:{status:'failed',tests_executed:false}}};
-  const oldController={id:'old-controller',kind:'development_test',status:'completed',artifact_id:old.id};
+  const oldController={id:'old-controller',kind:'development_test',status:'completed',artifact_id:old.id,candidate_id:c.id,development_id:p.id};
   const controller={id:'controller',kind:'development_test',status:'completed',artifact_id:t.id,candidate_id:c.id,development_id:p.id};
   const contract={id:'contract',kind:'artifact',revision:1,status:'Draft',content:'Whole contract '+'x'.repeat(120)};
   const oldQA={id:'prior-unknown',role:'qa',instance_id:'qa-old',native_id:'native-old-unknown',status:'failed',started_at:'2001-01-01T00:00:00.000Z',session_key:'qa:review:receipt:1',review_of:{id:t.id,revision:1},inputs:[{id:'contract',revision:1}],supplemental_sources:[],execution_failure:{termination_confirmed:false,outcome:'timeout',code:'ROLE_TIMEOUT'}};
   const failureHome={id:'failure-home',kind:'artifact',revision:1,status:'Draft',content:JSON.stringify({canonical_public_terminal_job:{complete_data:{value:oldQA}}})};
   const records={plan:p,candidate:c,receipt:t,contract,'failure-home':failureHome},jobs={producer,'controller':controller,'prior-unknown':oldQA};
   withStore(root,db=>db.transaction('company.created',()=>({schema:2,runtime_version:VERSION,id:id('company'),name:'Controlled continuation source test',idea:'No product authority',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id:a.session_id,epoch:1},records,sessions:{[oldQA.session_key]:{instance_id:oldQA.instance_id,native_id:oldQA.native_id}},jobs:{},messages:[],notices:[],created_at:new Date().toISOString()})),true);
+  Object.assign(p,await developmentAction({...a,action:'authorize',plan_id:p.id,scope_sha256:p.development.scope_sha256,model_data_approved:true,source_instruction:'Controlled fictional Source fixture: authorize this exact initially-live carrier scope only; no candidate execution, real model or Native acceptance.'},'codex'));
   // The business history remains fictional DATA. Each operational carrier is
   // newly staged through the actual Original writer, never backfilled onto an
   // existing prefix. In particular the old failed/UNKNOWN unit stays occupied.
-  for(const job of Object.values(jobs))Object.assign(job,stageOriginalHistoricalJob(root,job));
+  const stage=job=>job.kind==='development_test'?stageOriginalReviewController(root,{jobId:job.id,planId:p.id,candidateId:c.id,receiptId:job.artifact_id}):stageOriginalHistoricalJob(root,job);
+  for(const job of Object.values(jobs))Object.assign(job,stage(job));
   const pendingHistorical=[];
   change(a,s=>{
     s.records['failure-home'].content=JSON.stringify({canonical_public_terminal_job:{complete_data:{value:s.jobs[oldQA.id]}}});
-    p.development.authorization={decision_id:'old-authorization',authority_sha256:developmentReviewAuthority(s,p.id)};
-    s.records[p.id]=p;
     if(recovery) {
       const diagResult={status:'passed',tests_executed:false,launch_intent:false},diag={id:'diagnostic',kind:'artifact',revision:1,status:'Submitted',author_role:'runtime',author_instance:'diagnostic-controller',content:JSON.stringify(diagResult),development:{type:'preflight_diagnostic',result:diagResult,receipt_sha256:hash(diagResult)}};
       s.records[old.id]=old;s.records[diag.id]=diag;
@@ -70,12 +77,14 @@ function fixture({recovery=true,legacy=true}={}) {
       s.records.receipt.development.preflight_recovery_id='recovery';s.records.candidate.development.preflight_recovery='recovery';s.records.candidate.development.run_history=[originalCandidate.development.run];
     }
   });
-  for(const job of pendingHistorical)Object.assign(job,stageOriginalHistoricalJob(root,job));
+  for(const job of pendingHistorical)Object.assign(job,stage(job));
   if(recovery)change(a,s=>{
     const r=s.records.recovery.development;r.subject.job_sha256=hash(s.jobs[oldController.id]);
     if(legacy)r.proof.legacy.producer_sha256=hash(s.jobs['legacy-qa-job']);
   });
-  return {...a,plan_id:p.id,candidate_id:c.id,receipt_id:t.id,receipt_sha256:t.development.receipt_sha256,prior_job_id:oldQA.id,prior_job_sha256:hash(oldQA),failure_evidence_id:failureHome.id,source_instruction:'CONTROLLED NEW HUMAN PRIMARY FIXTURE: one read-only review and local acceptance, explicit old UNKNOWN reservation retained.',approval_reference:id('controlled-primary-approval'),model_data_approved:true,unknown_prior_replacement_approved:true,expires_at:new Date(Date.now()+3600000).toISOString(),code_review_window_minutes:30};
+  const reviewStart=Date.parse(scope.expires_at)+1000;
+  return {...a,reviewStart,plan_id:p.id,candidate_id:c.id,receipt_id:t.id,receipt_sha256:t.development.receipt_sha256,prior_job_id:oldQA.id,prior_job_sha256:hash(oldQA),failure_evidence_id:failureHome.id,source_instruction:'CONTROLLED NEW HUMAN PRIMARY FIXTURE: one read-only review and local acceptance, explicit old UNKNOWN reservation retained.',approval_reference:id('controlled-primary-approval'),model_data_approved:true,unknown_prior_replacement_approved:true,expires_at:new Date(reviewStart+3600000).toISOString(),code_review_window_minutes:30};
+  }finally{globalThis.Date=RealDate;}
 }
 function authorized(a) {const proposal=prepareReviewContinuation(read(a),a,a.root);let t;change(a,s=>{t=authorizeReviewContinuation(s,{...a,proposal_sha256:hash(proposal)},a.root);});return t;}
 function queued(a,t,{defer=true}={}) {
