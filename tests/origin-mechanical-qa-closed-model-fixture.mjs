@@ -23,6 +23,9 @@ export function closedMechanicalModel(f,{beforeBirth,native_id=randomUUID()}={})
   let birth=null,receipt=null,observerFailed=false,observerFailure;
   const retainFailure=error=>{if(!observerFailed){observerFailed=true;observerFailure=error;}throw error;};
   const forwarded={...options,
+   // Cosmetic Codex naming can otherwise schedule a later unmocked process.
+   // Change only the copied adapter arguments, never the worker's options.
+   sessionTitle:undefined,sessionNameDirectory:undefined,sessionNameSupport:false,
    onModelProcess(value){try{options.onModelProcess(value);birth=copy(value);}catch(error){retainFailure(error);}},
    onModelClosure(value,closure){try{options.onModelClosure(value,closure);assert.deepEqual(value,birth);receipt=copy(closure);}catch(error){retainFailure(error);}}
   };
@@ -30,7 +33,8 @@ export function closedMechanicalModel(f,{beforeBirth,native_id=randomUUID()}={})
   // Deliver output and close as test stimuli to the exact returned emitter.
   // Neither callbacks nor a cleanup path construct a birth/close receipt.
   carrier.respond(text);
-  const output=await carrier.promise;
+  let output;
+  try{output=await carrier.promise;}catch(error){if(observerFailed)throw observerFailure;throw error;}
   if(observerFailed)throw observerFailure; // preserve the exact first rejection, including primitive values
   assert.ok(birth);assert.ok(receipt);assert.equal(receipt.exit_code,0);assert.equal(receipt.signal,null);
   assert.equal(assertOriginalOrdinaryModelObservedFrom(options.originalExecutionLaunch,birth,receipt),true);
