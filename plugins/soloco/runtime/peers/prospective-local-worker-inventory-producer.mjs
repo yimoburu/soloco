@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {Store,originalStoreExecutionCustodyFrom,originalStoreRetainedCommitCutoffFrom,inspectRuntimeStoreCommitWitnessFrom,retainOriginalStoreCommitCutoffFrom as retainStoreCutoff} from '../store.mjs';
-import {readNormalized} from '../record-storage.mjs';
+import {readNormalized,readStorageIntake} from '../record-storage.mjs';
 import {prepareRuntimeOriginalModelAuthorityFrom,assertRuntimeOriginalModelAuthorityFrom} from '../runtime-execution.mjs';
 import {comparisonEvidenceEventFrom} from '../integrated-comparison-evidence.mjs';
 import {bindSnapshots,resolveSnapshotEntry} from '../snapshot.mjs';
@@ -150,10 +150,11 @@ function assignmentTransition(before,after,type){
   }
   need(changed===1,'LAUNCH_CHANGED');
 }
-function originalHistory(loan,{current=storedProjection(loan),verifyCurrent=true}={}){
+function originalHistory(loan,{current=storedProjection(loan),verifyCurrent=true,historicalCut=null}={}){
   need(current,'ORIGIN_REQUIRED');validOrigin(current.origin,loan,current.id);
+  if(historicalCut!==null)need(verifyCurrent&&positive(historicalCut.seq)&&hex(historicalCut.event_sha256),'HISTORICAL_CUT_REQUIRED');
   const aggregate=bounded(loan,'events','value');need(aggregate.n>0,'HISTORY_REQUIRED');
-  const rows=query(loan,'SELECT seq,at,type,value FROM events ORDER BY seq','all');let previous=null,last=null,jobs={},upgrades={},origin=null,id=null;
+  const rows=query(loan,'SELECT seq,at,type,value FROM events ORDER BY seq','all');let previous=null,last=null,jobs={},upgrades={},origin=null,id=null,historical=null;
   for(let i=0;i<rows.length;i++){
     const row=rows[i];need(row.seq===i+1&&typeof row.value==='string','HISTORY_REQUIRED');let payload;try{payload=JSON.parse(row.value);}catch{need(false,'HISTORY_REQUIRED');}
     const w=payload.original_execution;
@@ -168,9 +169,16 @@ function originalHistory(loan,{current=storedProjection(loan),verifyCurrent=true
     }
     const upgraded=new Set();for(const c of w.upgrade_changes){need(closed(c,['id','before_sha256','after'])&&text(c.id)&&!upgraded.has(c.id),'UPGRADE_HISTORY_CHANGED');upgraded.add(c.id);const old=upgrades[c.id]??null;need(c.before_sha256===(old===null?null:digest(old))&&c.after?.id===c.id,'UPGRADE_HISTORY_CHANGED');validUpgrade(c.after,origin);upgradeTransition(old,c.after,row.type);upgrades[c.id]=copy(c.after);}
     need(w.after_sha256===projectionHash({id,origin,jobs,upgrades}),'HISTORY_CHANGED');previous=hash(JSON.stringify([row.seq,row.at,row.type,row.value]));last=row;
+    if(historicalCut?.seq===row.seq){
+      need(historicalCut.event_sha256===previous,'HISTORICAL_CUT_CHANGED');
+      historical=copy({id,origin,jobs,upgrades,event_sequence:row.seq,event_sha256:previous});
+    }
   }
   if(verifyCurrent)need(same({id,origin,jobs,upgrades},current),'PHYSICAL_STATE_CHANGED');
   for(const [jobId,job]of Object.entries(jobs)){need(jobId===job.id,'ASSIGNMENT_REQUIRED');validAssignment(job,origin);}
+  // A historical projection never skips the later journal or today's physical
+  // equality check. Execution/inventory callers retain the current default.
+  if(historicalCut!==null){need(historical,'HISTORICAL_CUT_REQUIRED');return historical;}
   return {id,origin,jobs,upgrades,event_sequence:last.seq,event_sha256:previous};
 }
 function assignmentOccupied(job){
@@ -235,6 +243,29 @@ export function bindOriginalWorkerAssignmentBookkeepingFrom(store,state){
   // Absence is raw fallback, not an alternate issuer or an exception that can
   // accidentally skip the ordinary context-preservation obligations.
   try{const loan=originalStoreExecutionCustodyFrom(store),p=storedProjection(loan);if(!p?.origin)return null;const history=originalHistory(loan,{current:p});bindBookkeeping(state,history.origin,history.jobs,writes.get(store)?.lease??null);return true;}catch{return null;}
+}
+export function bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(actualDb,state,basis){
+  const loan=originalStoreExecutionCustodyFrom(actualDb);
+  return check(loan,()=>{
+    // Authenticate the complete immutable baseline and its continuation in
+    // this actual Store. Caller JSON alone never establishes provenance.
+    readStorageIntake(loan.db,basis);
+    need(state&&typeof state==='object'&&!Array.isArray(state),'HISTORICAL_STATE_CHANGED');
+    if(!own(state,'original_execution_origin'))return null;
+    // The immutable cut must precede this write. An uncommitted tail could
+    // otherwise acquire a lease-free historical proof and survive rollback.
+    if(loan.mode==='write'){
+      const writing=writes.get(loan.store);
+      need(writing?.history&&basis.seq<=writing.history.event_sequence,'HISTORICAL_CUT_UNCOMMITTED');
+      const anchor=query(loan,'SELECT seq,at,type,value FROM events WHERE seq=?','get',writing.history.event_sequence);
+      need(anchor&&hash(JSON.stringify([anchor.seq,anchor.at,anchor.type,anchor.value]))===writing.history.event_sha256,'HISTORICAL_CUT_CHANGED');
+    }
+    const history=originalHistory(loan,{historicalCut:basis});
+    need(same({id:state.id,origin:state.original_execution_origin,jobs:state.jobs??{},upgrades:upgradeProjection(state)},
+      {id:history.id,origin:history.origin,jobs:history.jobs,upgrades:history.upgrades}),'HISTORICAL_STATE_CHANGED');
+    // Factual metadata only: no live write lease, reservation or launch token.
+    bindBookkeeping(state,history.origin,history.jobs,null);return true;
+  });
 }
 export function inheritOriginalWorkerAssignmentBookkeepingFrom(source,derived){const proof=bookkeepingFor(source);if(!bookkeepingLive(proof)||!derived||typeof derived!=='object'||derived.id!==proof.company_id)return null;bookkeeping.set(derived,proof);return true;}
 export function inspectOriginalWorkerAssignmentBookkeepingFrom(state,job){
