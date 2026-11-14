@@ -332,7 +332,8 @@ export async function runLocalTests({directory,test_paths,timeout_ms=30000,max_o
         if(done)return;done=true;pendingResult=result;
         // A result message does not close its watchdog. Keep the finite timer
         // until the actual child close; the guarded close observer runs first.
-        try{if(helper.connected)helper.disconnect();}catch{}
+        // The watchdog flushes its result and owns IPC disconnect. Closing the
+        // parent channel here can preempt EOF and lose Node's IPC close count.
         if(helperClosed)settle(result);
       };
       const reject=message=>{abort();finish(failed(message,errorText,fixtureSetup));};

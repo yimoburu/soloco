@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {channel} from 'node:diagnostics_channel';
+import {fileURLToPath} from 'node:url';
 import {ordinaryExecutionLifecycleProtocol,ordinaryExecutionReceiptMatches,runLocalTests,sandboxCapability} from '../plugins/soloco/runtime/local-sandbox.mjs';
 import {testFixtureIdentity} from '../plugins/soloco/runtime/test-fixtures.mjs';
 
@@ -149,6 +151,42 @@ test('LIVE planned: known failed tests keep failure and still attest close/clean
   if(!live(t))return;
   const value=candidate("import test from 'node:test';import assert from 'node:assert/strict';test('known failure',()=>assert.fail('expected'));");
   const result=await runCase(value);assert.equal(result.status,'failed');assert.notEqual(result.exit_code,0);closed(result,value);
+});
+test('LIVE planned: a failed test settles only after its real watchdog close',async t=>{
+  if(!live(t))return;
+  const value=candidate("import test from 'node:test';import assert from 'node:assert/strict';test('known IPC closure failure',()=>assert.fail('expected'));"),watchdogs=[],errors=[],pending=new Map(),listeners=[];
+  const runner=fileURLToPath(new URL('../plugins/soloco/runtime/local-sandbox.mjs',import.meta.url)),publication=channel('child_process');
+  const once=(emitter,event,fn)=>{listeners.push([emitter,event,fn]);emitter.once(event,fn);};
+  // Node publishes the original ChildProcess before filling spawnargs. Filter
+  // at its real spawn event; this observer never wraps spawn or emits events.
+  const observe=({process:child})=>{try{
+    const onSpawn=()=>{pending.delete(child);try{
+      const args=child.spawnargs;
+      if(!Array.isArray(args)||args[1]!==runner||args[2]!=='--watch-tests')return;
+      if(JSON.parse(args[3]).payload?.root!==value.directory)return;
+      const row={child,exit:false,close:false,disconnect:false,stderrEnd:false,stderrClose:false};watchdogs.push(row);
+      once(child,'exit',()=>{row.exit=true;});once(child,'close',()=>{row.close=true;});once(child,'disconnect',()=>{row.disconnect=true;});
+      once(child.stderr,'end',()=>{row.stderrEnd=true;});once(child.stderr,'close',()=>{row.stderrClose=true;});
+    }catch(error){errors.push(error);}};
+    pending.set(child,onSpawn);child.once('spawn',onSpawn);
+  }catch(error){errors.push(error);}};
+  publication.subscribe(observe);
+  try{
+    const result=await runCase(value);
+    assert.deepEqual(errors,[]);assert.equal(watchdogs.length,1,'One actual watchdog for this fixture must be observed');
+    const observed=watchdogs[0];
+    assert.equal(observed.exit,true,'Watchdog exit must precede runner settlement');
+    assert.equal(observed.close,true,'Original watchdog close must precede runner settlement');
+    assert.equal(observed.stderrEnd,true);assert.equal(observed.stderrClose,true);assert.equal(observed.child.connected,false);
+    // The disconnect notification can be queued by Node after EOF accounting.
+    // Check close above before yielding; never wait for a missing close here.
+    await new Promise(resolve=>setImmediate(resolve));assert.equal(observed.disconnect,true);
+    assert.equal(result.status,'failed',JSON.stringify(result));assert.notEqual(result.exit_code,0);closed(result,value);
+  }finally{
+    publication.unsubscribe(observe);
+    for(const [child,fn]of pending)child.removeListener('spawn',fn);
+    for(const [emitter,event,fn]of listeners)emitter.removeListener(event,fn);
+  }
 });
 test('LIVE planned: timeout and output stops await close and preserve bounded output',async t=>{
   if(!live(t))return;
