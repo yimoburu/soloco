@@ -47,6 +47,7 @@ const realNow=Date.now;
 const nativeSchedule=setTimeout,nativeUnschedule=clearTimeout;
 const nativeSignalAdd=EventTarget.prototype.addEventListener,nativeSignalRemove=EventTarget.prototype.removeEventListener;
 const writes=new WeakMap(),capabilities=new WeakMap(),originalDescriptors=new WeakMap();
+const modelRequestCommits=new WeakMap(),originalModelAuthorities=new WeakMap();
 const childDeadlines=new WeakMap();
 const failures=new WeakMap(),bookkeeping=new WeakMap(),bookkeepingBuckets=new WeakMap();
 
@@ -240,12 +241,15 @@ export function prepareRuntimeModelRequestFrom(store,state,input){
   const job=state.jobs?.[input.job_id],old=w.before.jobs?.[input.job_id];
   need(job&&old&&validateLegacyRuntimeJobShape(job)&&job.status==='running'&&job.worker_pid===process.pid&&job.legacy_runtime.worker?.birth?.pid===process.pid&&job.legacy_runtime.worker.closure===null&&modelProcessProducerTransition(old,job,w.type),'MODEL_REQUEST_REQUIRED');
   const entry=job.model_process_tracking.invocations.at(-1);
-  need(entry.invocation_id===input.invocation_id&&entry.job_id===job.id&&entry.instance_id===job.instance_id&&entry.worker_pid===process.pid&&entry.host===job.host&&input.host===job.host&&typeof input.prompt==='string'&&path.isAbsolute(input.cwd)&&!w.tokens.some(token=>capabilities.get(token)?.invocation_id===input.invocation_id),'MODEL_REQUEST_REQUIRED');
+  need(entry.invocation_id===input.invocation_id&&entry.job_id===job.id&&entry.instance_id===job.instance_id&&entry.worker_pid===process.pid&&entry.host===job.host&&input.host===job.host&&(input.native_id===null||typeof input.native_id==='string')&&typeof input.prompt==='string'&&path.isAbsolute(input.cwd)&&!w.tokens.some(token=>capabilities.get(token)?.invocation_id===input.invocation_id),'MODEL_REQUEST_REQUIRED');
   need(nativeParse(entry.requested_at)<=clock()&&nativeParse(entry.requested_at)>=nativeParse(job.started_at),'MODEL_REQUEST_TIMESTAMP_REQUIRED');
   const rest=value=>Object.fromEntries(Object.entries(value).filter(([key])=>key!=='model_process_tracking'));
   if(!same(rest(old),rest(job)))need(legacyRetentionModelRequestTransition(old,job)&&job.retention_primary_delivery.frame_sha256===sha(input.prompt),'MODEL_REQUEST_ASSIGNMENT_CHANGED');
   const binding={host:input.host,native_id:input.native_id,prompt_sha256:sha(input.prompt),cwd:path.resolve(input.cwd),selection_sha256:digest(input.selection)};
-  const {token,r}=makeCapability(w,job,{kind:'model',invocation_id:input.invocation_id,model_binding:binding});r.request=copy(entry);return token;
+  const requestInput=Object.freeze({...binding,prompt_utf16_sha256:createHash('sha256').update(input.prompt,'utf16le').digest('hex'),prompt_utf16_units:input.prompt.length});
+  const requestPolicy=Object.freeze(normalizeTimeout({timeout_ms:job.timeout_ms,timeout_reason:job.timeout_reason}));
+  const grantJob={...job};delete grantJob.execution_deadline_at;const requestAuthorityDeadline=authorityDeadline(state,grantJob,w.loan.root),requestExecutionTiming=modelRequestKnownExecution(job,clock());
+  const {token,r}=makeCapability(w,job,{kind:'model',invocation_id:input.invocation_id,model_binding:binding});r.request=copy(entry);r.request_input_binding=requestInput;r.request_timeout_policy=requestPolicy;r.request_authority_deadline_at_ms=requestAuthorityDeadline;r.request_known_execution=requestExecutionTiming;return token;
 }
 function intendedJobs(w,state,{selected=false,before=null}={}){
   if(!selected)return state.jobs??{};
@@ -283,7 +287,7 @@ export function validateRuntimeExecutionCommitFrom(store){
   for(const r of [...w.tokens.map(token=>capabilities.get(token)),...(w.launch_record?[w.launch_record]:[])]){const job=state.jobs?.[r.job_id];need(job&&recordsBinding(state,job)===r.authority&&authorityDeadline(state,job,r.root)===r.authority_deadline_at_ms,'ACTIVE_AUTHORITY_CHANGED');}
   w.validated=true;
 }
-export function runtimeExecutionUsesNativeClockFrom(store){return writes.get(store)?.lane==='legacy';}
+export function runtimeExecutionUsesNativeClockFrom(store){const w=writes.get(store);return w?.lane==='legacy'||w?.lane==='original'&&original.originalModelRequestUsesNativeCommitFrom(store);}
 export function runtimeExecutionCommitCutoffFrom(store){
   const w=writes.get(store);if(!w||w.lane!=='legacy')return null;
   originalStoreExecutionCustodyFrom(store);let value=w.cutoff;
@@ -295,8 +299,95 @@ export function runtimeExecutionCommitCutoffFrom(store){
 export function commitRuntimeExecutionWriteFrom(store,witness){
   const w=writes.get(store);if(!w)return;
   const facts=inspectRuntimeStoreCommitWitnessFrom(witness,store);need(facts.scope===w.scope&&facts.root===w.loan.root,'COMMIT_WITNESS_REQUIRED');
-  if(w.lane==='legacy'){need(w.sealed&&w.validated,'UNPERSISTED_REQUEST');for(const token of w.tokens){const r=capabilities.get(token);need(r&&!r.invalid&&!r.committed,'CAPABILITY_REQUIRED');}for(const token of w.tokens)capabilities.get(token).committed=true;}
+  if(w.lane==='legacy'){
+    need(w.sealed&&w.validated,'UNPERSISTED_REQUEST');const confirmations=[],ready=[];
+    for(const token of w.tokens){
+      const r=capabilities.get(token);need(r&&!r.invalid&&!r.committed,'CAPABILITY_REQUIRED');ready.push(r);
+      if(r.kind==='model'){
+        need(w.type==='job.model_process.requested'&&r.request_input_binding&&!modelRequestCommits.has(token),'MODEL_REQUEST_COMMIT_REQUIRED');
+        confirmations.push([token,Object.freeze({protocol:'runtime-model-request-commit-v1',stage:'request',lane:'legacy',store,db:w.loan.db,root:facts.root,scope:facts.scope,type:w.type,job_id:r.job_id,instance_id:r.instance_id,invocation_id:r.invocation_id,input_binding:r.request_input_binding,timeout_policy:r.request_timeout_policy})]);
+      }
+    }
+    // Construct every throwing binding before arming any capability. A child
+    // creation write's launch_record is deliberately not request issuance.
+    for(const [token,confirmation]of confirmations)modelRequestCommits.set(token,confirmation);
+    for(const r of ready)r.committed=true;
+  }else if(w.lane==='original')original.retainOriginalModelRequestCommitFrom(store,witness);
   w.lease.status='committed';
+}
+// Historical REQUEST facts only, minted by the fixed Store post-COMMIT hook.
+// Reading them after close/consumption/failure never refreshes a launch token,
+// proves child creation, or replaces the existing active/process result guards.
+export function inspectRuntimeModelRequestCommitFrom(token,issuingStore){
+  const r=capabilities.get(token);
+  if(!r)return original.inspectOriginalModelRequestCommitFrom(token,issuingStore);
+  const facts=modelRequestCommits.get(token);
+  need(r.kind==='model'&&r.committed&&facts&&r.store===issuingStore&&facts.store===issuingStore,'MODEL_REQUEST_COMMIT_REQUIRED');
+  return facts;
+}
+function modelRequestExecutionDeadline(job,now){
+  if(!own(job,'execution_deadline_at')){need(!own(job,'execution_started_at')&&!own(job,'termination_deadline_at'),'MODEL_OVERALL_DEADLINE_REQUIRED');return null;}
+  need(typeof job.execution_deadline_at==='string','MODEL_OVERALL_DEADLINE_REQUIRED');
+  const value=finite(nativeParse(job.execution_deadline_at)),timing=jobTimeoutState(job,now);
+  need(timing.state==='executing'&&nativeParse(timing.deadline_at)===value&&now<value,'MODEL_OVERALL_DEADLINE_EXPIRED');return value;
+}
+function modelRequestTiming(job){return Object.fromEntries(['execution_started_at','execution_deadline_at','termination_deadline_at'].filter(key=>own(job,key)).map(key=>[key,job[key]]));}
+function modelRequestKnownExecution(job,now){return modelRequestExecutionDeadline(job,now)===null?null:Object.freeze(modelRequestTiming(job));}
+function originalModelAuthority(state,job,root){
+  // Original owns its typed assignment/launch identity separately. Generic
+  // authority must tolerate only the same execution lifecycle as Legacy.
+  const bindingJob={...job};delete bindingJob.original_execution_assignment;
+  const grantJob={...job};delete grantJob.execution_deadline_at;
+  return {authority_sha256:recordsBinding(state,bindingJob,{afterCreation:true}),authority_deadline_at_ms:authorityDeadline(state,grantJob,root)};
+}
+// Fixed Source loan for the new Original opt-in preparer. No caller-selected
+// state, callback, cold JSON or returned fingerprint can issue a model token.
+export function prepareRuntimeOriginalModelAuthorityFrom(store,state,job){
+  const w=active(store,state);
+  need(w.lane==='original'&&w.type==='job.model_process.launch_requested'&&state.jobs?.[job?.id]===job&&job.status==='running'&&job.worker_pid===process.pid&&job.epoch===state.owner?.epoch,'ORIGINAL_MODEL_AUTHORITY_REQUIRED');
+  const facts=originalModelAuthority(state,job,w.loan.root),known_execution=modelRequestKnownExecution(job,clock()),loan=Object.freeze({});
+  originalModelAuthorities.set(loan,{store,root:w.loan.root,scope:w.scope,company_id:state.id,job_id:job.id,instance_id:job.instance_id,known_execution,...facts});return loan;
+}
+export function assertRuntimeOriginalModelAuthorityFrom(subject,issuingStore,preparedScope,jobId){
+  const r=originalModelAuthorities.get(subject);
+  need(r&&r.store===issuingStore&&r.scope===preparedScope&&r.job_id===jobId&&!r.store.closed,'ORIGINAL_MODEL_AUTHORITY_REQUIRED');
+  return r.store.readSnapshot(()=>{
+    const actual=originalStoreExecutionCustodyFrom(r.store);
+    need(actual.store===r.store&&actual.root===r.root,'ORIGINAL_MODEL_AUTHORITY_CHANGED');
+    const write=actual.mode==='write'?writes.get(r.store):null;
+    if(actual.mode==='write')need(write&&write.scope===actual.scope,'ORIGINAL_MODEL_AUTHORITY_REQUIRED');
+    // Only the actual unsealed Store callback lends next state. Once the
+    // physical write is sealed, reread rows rather than trusting stale next.
+    const state=write&&!write.sealed?actual.state:boundState(r.store),job=state?.jobs?.[r.job_id];
+    need(state?.id===r.company_id&&job&&job.instance_id===r.instance_id&&job.status==='running'&&job.worker_pid===process.pid&&job.epoch===state.owner?.epoch,'ORIGINAL_MODEL_AUTHORITY_CHANGED');
+    const facts=originalModelAuthority(state,job,r.root);
+    need(facts.authority_sha256===r.authority_sha256&&facts.authority_deadline_at_ms===r.authority_deadline_at_ms,'ORIGINAL_MODEL_AUTHORITY_CHANGED');
+    if(r.known_execution!==null)need(same(modelRequestTiming(job),r.known_execution),'MODEL_OVERALL_DEADLINE_CHANGED');
+    const now=clock();if(facts.authority_deadline_at_ms!==null)need(now<finite(facts.authority_deadline_at_ms),'ORIGINAL_MODEL_AUTHORITY_EXPIRED');
+    const execution=modelRequestExecutionDeadline(job,now);
+    return Object.freeze({authority_deadline_at_ms:facts.authority_deadline_at_ms,execution_deadline_at_ms:execution});
+  });
+}
+// Phase-agnostic currentness/bounds for the opt-in outcome facade. Actual
+// process closure and strict per-call timing remain separate private guards.
+export function assertRuntimeModelRequestCurrentFrom(token,issuingStore){
+  const r=capabilities.get(token);
+  if(!r)return original.assertOriginalModelRequestCurrentFrom(token,issuingStore);
+  inspectRuntimeModelRequestCommitFrom(token,issuingStore);
+  need(!r.invalid&&!r.store.closed&&!signalAborted(r.signal),'MODEL_REQUEST_CURRENT_REQUIRED');
+  return withCurrent(r,state=>{
+    const job=state.jobs?.[r.job_id],entry=job?.model_process_tracking?.invocations?.find(x=>x.invocation_id===r.invocation_id);
+    need(job&&job.status==='running'&&job.worker_pid===process.pid&&job.instance_id===r.instance_id&&job.legacy_runtime.worker?.birth?.pid===process.pid&&job.legacy_runtime.worker.closure===null&&job.model_process_tracking.current===r.invocation_id&&entry&&recordsBinding(state,job,{afterCreation:true})===r.after_authority,'MODEL_ASSIGNMENT_CHANGED');
+    const grantJob={...job};delete grantJob.execution_deadline_at;
+    const grant=authorityDeadline(state,grantJob,r.root);
+    // Non-operation expiry is captured independently of first-spawn timing.
+    need(grant===r.request_authority_deadline_at_ms,'MODEL_AUTHORITY_CHANGED');
+    const now=clock();if(grant!==null){need(now<finite(grant),'MODEL_AUTHORITY_EXPIRED');if(r.closed_at_ms!==undefined)need(r.closed_at_ms<grant,'MODEL_AUTHORITY_EXPIRED');}
+    if(r.request_known_execution!==null)need(same(modelRequestTiming(job),r.request_known_execution),'MODEL_OVERALL_DEADLINE_CHANGED');
+    const execution=modelRequestExecutionDeadline(job,now);
+    if(execution!==null&&r.closed_at_ms!==undefined)need(r.closed_at_ms<execution,'MODEL_OVERALL_DEADLINE_EXPIRED');
+    return Object.freeze({authority_deadline_at_ms:grant,execution_deadline_at_ms:execution});
+  });
 }
 export function endRuntimeExecutionWriteFrom(store){const w=writes.get(store);if(w){if(w.lease.status!=='committed')w.lease.status='revoked';for(const token of w.tokens){const r=capabilities.get(token);if(r&&!r.committed)r.invalid=true;}}writes.delete(store);}
 function cap(token,kind,{consumed=false}={}){
