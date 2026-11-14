@@ -7,15 +7,16 @@ import * as engine from '../plugins/soloco/runtime/engine.mjs';
 import {call} from '../plugins/soloco/runtime/main.mjs';
 import {Store,withStore,teamHash} from '../plugins/soloco/runtime/store.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
-import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
+import {controlledOriginalWorker} from './controlled-original-worker-fixture.mjs';
 import {resourceClaims} from '../plugins/soloco/runtime/coordination.mjs';
 import {runFictionalQualification} from '../tools/qualify-fictional.mjs';
 
-// All databases, bindings and sessions are disposable; dispatch never launches
-// a worker or provider process. Only work() invokes the injected local adapter.
+// Disposable Source mechanics: original issuers/observers consume controlled
+// ChildProcess events. No OS worker, CLI, provider or Native acceptance is run.
 const tmp=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'cancel-finalization-')));
 const previous=process.env.COMPANY_PLUGIN_DATA;
-test.after(()=>{if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(tmp,{recursive:true,force:true});});
+const workers=[];
+test.after(()=>{for(const worker of workers)worker.dispose();if(previous===undefined)delete process.env.COMPANY_PLUGIN_DATA;else process.env.COMPANY_PLUGIN_DATA=previous;fs.rmSync(tmp,{recursive:true,force:true});});
 const check=()=>({available:true,authenticated:true,version:'synthetic'}),launch=()=>({on(){},unref(){}});
 const read=root=>withStore(root,db=>db.read());
 async function fixture(revoke=false) {
@@ -35,7 +36,8 @@ async function fixture(revoke=false) {
  }
  const job=engine.dispatch({...base,role:'qa',task:'Bounded synthetic assignment.',resources:['fixture/shared'],...(target?{review_of:target.id}:{})},host,{check,launch});
  const cancel=()=>revoke?call('company_context',{...base,action:'revoke',plan_id:plan.id,source_instruction:'Revoke synthetic maintenance.'},host):call('company_control',{root,session_id:base.session_id,action:'pause',expected_epoch:1,source_instruction:'Cancel synthetic assignment.'},host);
- return {root,base,host,job,cancel,directory,revoke};
+ const worker=controlledOriginalWorker(root);workers.push(worker);
+ return {root,base,host,job,cancel,directory,revoke,worker};
 }
 async function storageRoundTrip(f) {
  const {root,base,host,directory}=f,before=read(root);
@@ -52,16 +54,39 @@ async function storageRoundTrip(f) {
 }
 
 function pendingAdapter() {
- let reject,options;
+ let reject,options,process;
  const pending=new Promise((resolve,fail)=>{reject=fail;});
  return {
-  model:async(h,native,wire,dir,remaining,selection,value)=>{
-   options=value;options.onSpawn(executionTiming(Date.now(),{timeout_ms:remaining,timeout_reason:options.timeoutReason}));
+  model:async(h,native,wire,dir,remaining,selection,value,observed)=>{
+   options=value;process=observed;
    return pending;
   },
   aborted:()=>options.signal.aborted?Promise.resolve():new Promise(resolve=>options.signal.addEventListener('abort',resolve,{once:true})),
-  close:confirmed=>reject(Object.assign(Error('Original invocation closure evidence'),{code:'ROLE_ABORTED',...(confirmed===undefined?{}:{termination_confirmed:confirmed})}))
+  close:confirmed=>{
+   // Only true supplies an external close event. A public error flag, including
+   // omission, cannot fabricate an observation or release a reservation.
+   if(confirmed===true)process.close(1);
+   reject(Object.assign(Error('Original invocation closure evidence'),{code:'ROLE_ABORTED',...(confirmed===undefined?{}:{termination_confirmed:confirmed})}));
+  }
  };
+}
+function assertUnknownClosure(job){
+ assert.equal(job.finished_at,undefined);
+ assert.equal(job.coordination_release.termination_confirmed,false);
+ assert.equal(job.coordination_release.reason,'original_process_closure_unknown');
+ const invocation=job.model_process_tracking.invocations.at(-1);
+ assert.ok(invocation.birth);assert.equal(invocation.closure,null);
+ const original=job.original_execution_assignment.launches.find(launch=>launch.kind==='model');
+ assert.equal(original.birth.pid,invocation.birth.pid);assert.equal(original.closure,null);
+}
+function assertObservedClosure(job){
+ const invocation=job.model_process_tracking.invocations.at(-1);
+ assert.ok(invocation.birth);assert.equal(invocation.closure.exit_code,1);
+ const original=job.original_execution_assignment.launches.find(launch=>launch.kind==='model');
+ assert.equal(original.closure.pid,invocation.birth.pid);assert.equal(original.closure.code,1);
+ assert.equal(original.closure.never_started,false);
+ assert.equal(job.coordination_release.termination_confirmed,true);
+ assert.equal(job.coordination_release.reason,'model_process_closed');
 }
 async function assertStorageHeld(f) {
  assert.equal(resourceClaims(read(f.root)).length,1);
@@ -70,7 +95,7 @@ async function assertStorageHeld(f) {
 
 test('duplicates before and after pause cannot certify or overwrite the outstanding owner',async()=>{
  for(const confirmed of [false,undefined,true]){
-  const f=await fixture(),adapter=pendingAdapter(),owner=work(f.root,f.job.id,adapter.model);
+  const f=await fixture(),adapter=pendingAdapter(),owner=f.worker.work(f.job.id,adapter.model);
   let duplicateCalls=0;
   const duplicate=async()=>{duplicateCalls++;throw Error('Duplicate must not invoke');};
   try {
@@ -87,14 +112,14 @@ test('duplicates before and after pause cannot certify or overwrite the outstand
    await assertStorageHeld(f);
   } finally {adapter.close(confirmed);await owner;}
   const state=read(f.root),current=state.jobs[f.job.id];
-  assert.equal(current.status,'cancelled');assert.equal(current.execution_failure.termination_confirmed,confirmed);
+  assert.equal(current.status,'cancelled');assert.equal(current.execution_failure.termination_confirmed,confirmed===true);
   assert.equal(current.execution_failure.message,'Original invocation closure evidence');
   assert.equal(current.native_id,null);assert.equal(current.artifact_id,undefined);
   if(confirmed===true){
-   assert.ok(current.finished_at);assert.equal(current.coordination_release.reason,'model_process_closed');
+   assert.ok(current.finished_at);assertObservedClosure(current);
    assert.equal(resourceClaims(state).length,0);await storageRoundTrip(f);
   }else{
-   assert.equal(current.finished_at,undefined);assert.equal(current.coordination_release,undefined);await assertStorageHeld(f);
+   assertUnknownClosure(current);await assertStorageHeld(f);
   }
   const final=read(f.root);await work(f.root,f.job.id,duplicate);assert.deepEqual(read(f.root),final);
  }
@@ -109,44 +134,44 @@ test('failed startup rechecks ownership when another worker claims before failur
   if(type==='job.failed'&&!intercepted){
    intercepted=true;
    withStore(f.root,db=>transaction.call(db,'fixture.repair_context',s=>{delete s.jobs[f.job.id].context_sha256;return s;}));
-   owner=work(f.root,f.job.id,adapter.model);
+   owner=f.worker.work(f.job.id,adapter.model);
   }
   return transaction.call(this,type,change);
  };
  try {
-  await work(f.root,f.job.id,async()=>{throw Error('Rejected startup must not invoke');});
+  await f.worker.work(f.job.id,async()=>{throw Error('Rejected startup must not invoke');});
   assert.equal(intercepted,true);
   const current=read(f.root).jobs[f.job.id];
   assert.equal(current.status,'running');assert.ok(current.execution_started_at);
+  assert.equal(current.original_execution_assignment.launches.find(launch=>launch.kind==='worker').closure,null,'the rejected outer entry cannot close the still-running owner carrier');
   assert.equal(current.execution_failure,undefined);assert.equal(current.coordination_release,undefined);
   assert.equal(current.finished_at,undefined);
   await f.cancel();await adapter.aborted();await assertStorageHeld(f);
  } finally {Store.prototype.transaction=transaction;adapter.close(false);await owner;}
  const current=read(f.root).jobs[f.job.id];
- assert.equal(current.status,'cancelled');assert.equal(current.coordination_release,undefined);
- assert.equal(current.finished_at,undefined);await assertStorageHeld(f);
+ assert.equal(current.status,'cancelled');assertUnknownClosure(current);await assertStorageHeld(f);
 });
 
 test('pause/revoke cancellation finalizes only confirmed closure, then permits exact storage recovery',async()=>{
  for(const revoke of [false,true])for(const confirmed of [true,false,undefined]){
   const f=await fixture(revoke),{root,job}=f;
-  await work(root,job.id,async(h,native,wire,dir,remaining,selection,options)=>{
-   options.onSpawn(executionTiming(Date.now(),{timeout_ms:remaining,timeout_reason:options.timeoutReason}));
+  await f.worker.work(job.id,async(h,native,wire,dir,remaining,selection,options,process)=>{
    await f.cancel();
    // Exercise the actual monitor and its abort signal before adapter rejection.
-   await new Promise(resolve=>options.signal.addEventListener('abort',resolve,{once:true}));
+   if(!options.signal.aborted)await new Promise(resolve=>options.signal.addEventListener('abort',resolve,{once:true}));
+   if(confirmed===true)process.close(1);
    throw Object.assign(Error('Synthetic adapter cancelled; provider/descendant outcome unknown'),{code:'ROLE_ABORTED',...(confirmed===undefined?{}:{termination_confirmed:confirmed})});
   });
   const state=read(root),current=state.jobs[job.id];
   assert.equal(current.status,'cancelled');assert.equal(current.execution_failure.outcome,'cancellation');
-  assert.equal(current.execution_failure.termination_confirmed,confirmed);
+  assert.equal(current.execution_failure.termination_confirmed,confirmed===true);
   assert.equal(current.native_id,null);assert.equal(current.artifact_id,undefined);
   assert.equal(state.sessions[job.session_key].native_id,null);
   if(confirmed===true){
-   assert.ok(current.finished_at);assert.equal(current.coordination_release.reason,'model_process_closed');
+   assert.ok(current.finished_at);assertObservedClosure(current);
    assert.equal(resourceClaims(state).length,0);await storageRoundTrip(f);
   }else{
-   assert.equal(current.finished_at,undefined);assert.equal(current.coordination_release,undefined);
+   assertUnknownClosure(current);
    assert.equal(resourceClaims(state).length,1);
    for(const action of ['backup','migrate','restore'])await assert.rejects(call('company_storage',{...f.base,action,directory:path.join(f.directory,action),backup_dir:path.join(f.directory,'unused'),source_instruction:'Synthetic unknown closure must hold.'},f.host),/Uncertain worker/);
   }
@@ -169,11 +194,10 @@ test('queued cancellation closes truthfully without invoking an adapter, includi
 
 test('late success after pause stays quarantined and retains exact evidence through recovery',async()=>{
  const f=await fixture();
- await work(f.root,f.job.id,async(h,native,wire,dir,remaining,selection,options)=>{
-  options.onSpawn(executionTiming(Date.now(),{timeout_ms:remaining,timeout_reason:options.timeoutReason}));
+ await f.worker.work(f.job.id,async()=>{
   await f.cancel();
   return {native_id:'late-native',text:JSON.stringify({content:'Retained late result',messages:[{to:'qa',content:'Must not deliver'}],notices:[]})};
- });
+ },{nativeId:'late-native'});
  const state=read(f.root),current=state.jobs[f.job.id];
  assert.equal(current.status,'quarantined');assert.ok(current.finished_at);
  assert.equal(current.coordination_release.termination_confirmed,true);
@@ -185,10 +209,10 @@ test('late success after pause stays quarantined and retains exact evidence thro
 
 test('rejected late output after cancellation retains evidence without accepting it',async()=>{
  const f=await fixture();
- await work(f.root,f.job.id,async(h,native,wire,dir,remaining,selection,options)=>{
-  options.onSpawn(executionTiming(Date.now(),{timeout_ms:remaining,timeout_reason:options.timeoutReason}));await f.cancel();
+ await f.worker.work(f.job.id,async()=>{
+  await f.cancel();
   return {native_id:'rejected-native',text:JSON.stringify({content:'Retain rejected result',messages:[{to:'missing',content:'Invalid peer'}],notices:[]})};
- });
+ },{nativeId:'rejected-native'});
  const state=read(f.root),current=state.jobs[f.job.id];
  assert.equal(current.status,'cancelled');assert.ok(current.finished_at);assert.equal(current.artifact_id,undefined);
  assert.match(current.rejected_output.text,/Retain rejected result/);assert.equal(current.rejected_output.author_instance,f.job.instance_id);
