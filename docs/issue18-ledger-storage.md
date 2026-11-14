@@ -65,11 +65,16 @@ business validation, actual one-test/QA guards and E3 integration remain absent.
 
 ## Dependency and validation boundary
 
-The new tests use disposable synthetic metadata and real temporary files;
-they confer no selected profile or Native authority. All tests are authored
-**UNRUN**. Darwin positives explicitly require the optional Python/libc/APFS
-backend; other hosts retain the pure tests and truthful platform exclusions.
-There is no syntax/import/probe/build execution in the authoring evidence.
+The tests use disposable synthetic metadata and real temporary files; they
+confer no selected profile or Native authority. At source head `0b39169`, all
+13 controlled tests passed on Darwin with Node 22.23.2, with zero failures,
+cancellations, skips or todos. The original Node process exited 0 in 19.20
+seconds; the complete bounded check finished in 20.76 seconds. Source, Node,
+Python launcher and Git bindings matched before and after. Independent review
+and owning-CoS acceptance cover this filesystem component only. The earlier
+pre-audit Hold started no Node tests and remains a separate retained failure.
+Darwin positives require the optional Python/libc/APFS backend; other hosts
+retain the pure tests and explicit platform exclusions.
 The actual two-process contention case has a fixed Source program, a shared
 ready/release barrier, finite child/output bounds and retained original child
 handles. It requires one successful O_EXCL publication and one held contender,
@@ -77,13 +82,13 @@ with one exact immutable payload. Unexpected failures retain their fixture and
 child logs; only completed expected cases remove disposable data. Direct-child
 cleanup is recorded without claiming exhaustive descendant closure.
 
-Primary ABI references used for the unrun Darwin adapter are Apple's
+Primary ABI references used for the Darwin adapter are Apple's
 [ACL getter](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/acl_get_fd.3.html),
 [Libc ACL getter implementation](https://github.com/apple-oss-distributions/Libc/blob/main/posix1e/acl_file.c),
 [ACL entry implementation](https://github.com/apple-oss-distributions/Libc/blob/main/posix1e/acl_entry.c),
 [ACL constants/types](https://github.com/apple-oss-distributions/Libc/blob/main/include/sys/acl.h)
 and [XNU statfs64 layout](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/mount.h).
-These are Source references, not proof of the selected host ABI or filesystem.
+Other host, ABI and filesystem combinations require their own qualification.
 
 Default setup still promises Node-only operation: README23 and
 `plugins/soloco/skills/setup/SKILL.md`8 say no Python is needed;
