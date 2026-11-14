@@ -115,6 +115,66 @@ test('cold proposal grammar retains complete context readset, membership, base a
   assert.deepEqual(f.output.value.base,ref('homes',f.home));
 });
 
+// Dependency identity is the original four-field reference. The existing
+// task proposal writer also preserves the complete supplied canonical DATA.
+// These grammar checks issue no readiness and exercise no admission producer.
+test('cold task proposal retains a full admitted home source as dependency DATA',()=>{
+  const f=fixture('home/propose'),source=f.context.sources.find(r=>r.family==='homes'&&r.id===f.dependency.id);
+  assert.ok(source);assert.deepEqual(source.value,f.dependency.value);
+  const admitted=copy(f.admitted),qualification=copy(f.q),namespace=copy(f.namespace);
+  f.output.value.dependencies=[copy(source)];refresh(f);
+  assert.equal(f.check(),undefined);
+  assert.deepEqual(f.output.value.dependencies,[source]);
+  assert.deepEqual(f.command.value.result.value.dependencies,[source]);
+  assert.equal(f.output.sha256,peerDigest(f.output.value));
+  assert.deepEqual(f.admitted,admitted);assert.deepEqual(f.q,qualification);assert.deepEqual(f.namespace,namespace);
+});
+test('cold task dependency retains additional canonical metadata without changing its identity or authority',()=>{
+  const f=fixture('home/propose'),source=f.context.sources.find(r=>r.family==='homes'&&r.id===f.dependency.id);
+  const dependency={...copy(source),metadata:{label:'Opaque supplied DATA only.',unicode:'雪😀',ordered:[3,1,null]},annotation:{retained:true}};
+  const before={qualification:copy(f.q),namespace:copy(f.namespace),task:copy(f.admitted)};
+  f.output.value.dependencies=[dependency];refresh(f);
+  assert.equal(f.check(),undefined);
+  assert.deepEqual(ref(dependency.family,dependency),ref('homes',f.dependency));
+  assert.deepEqual(f.output.value.dependencies,[dependency]);
+  assert.deepEqual(f.command.value.result.value.dependencies,[dependency]);
+  assert.deepEqual({qualification:f.q,namespace:f.namespace,task:f.admitted},before);
+});
+for(const [name,mutate]of [
+  ['wrong family',d=>{d.family='notices';}],
+  ['wrong identity',d=>{d.id='SYNTHETIC-foreign-home';}],
+  ['invalid revision',d=>{d.revision=0;}],
+  ['different revision',d=>{d.revision++;}],
+  ['malformed hash',d=>{d.sha256='not-a-hash';}],
+  ['different hash',d=>{d.sha256='f'.repeat(64);}],
+  ...['family','id','revision','sha256'].map(key=>['missing '+key,d=>{delete d[key];}])
+])test(`cold task dependency metadata cannot repair ${name}`,()=>{
+  const f=fixture('home/propose'),source=f.context.sources.find(r=>r.family==='homes'&&r.id===f.dependency.id);
+  const dependency={...copy(source),metadata:{label:'Retained opaque metadata.'}};
+  mutate(dependency);f.output.value.dependencies=[dependency];refresh(f);
+  assert.throws(()=>f.check(),held);
+});
+test('cold task dependency metadata tamper without rehash invalidates the immutable output',()=>{
+  const f=fixture('home/propose'),source=f.context.sources.find(r=>r.family==='homes'&&r.id===f.dependency.id);
+  f.output.value.dependencies=[{...copy(source),metadata:{label:'Original metadata.'}}];refresh(f);
+  assert.equal(f.check(),undefined);
+  const beforeHash=f.output.sha256;
+  f.output.value.dependencies[0].metadata.label='Changed metadata without a new hash.';
+  assert.equal(f.output.sha256,beforeHash);assert.notEqual(peerDigest(f.output.value),beforeHash);
+  assert.throws(()=>f.check(),held);
+});
+test('cold task command result must preserve exact dependency metadata as well as identity',()=>{
+  const f=fixture('home/propose'),source=f.context.sources.find(r=>r.family==='homes'&&r.id===f.dependency.id);
+  f.output.value.dependencies=[{...copy(source),metadata:{label:'Original metadata.'}}];refresh(f);
+  assert.equal(f.check(),undefined);
+  const exactOutput=copy(f.output);
+  f.command.value.result.value.dependencies[0].metadata.label='Changed only in the command receipt.';
+  f.syncResult=false;refresh(f);
+  assert.deepEqual(f.output,exactOutput);
+  assert.deepEqual(ref('homes',f.command.value.result.value.dependencies[0]),ref('homes',f.output.value.dependencies[0]));
+  assert.throws(()=>f.check(),held);
+});
+
 test('cold earlier effect remains attributable after a later finish advances the current task epoch',()=>{
   const f=fixture(),finished=row(f.admitted.id,{...f.admitted.value,status:'returned',authority_epoch:3,authority_previous:ref('tasks',f.admitted),authority_event_seq:3,attempt:{...f.admitted.value.attempt,termination_confirmed:true},result:{output:'Synthetic later result.',termination_confirmed:true}},3,1);
   const op='SYNTHETIC-later-finish',command=row(peerDigest(['peer-command-v1','scheduler',op]),{principal_id:'scheduler',operation_id:op,action:'task/finish',request_sha256:'a'.repeat(64),result:{task:copy(finished),accepted:true,review:null},created_at:at},1,3);

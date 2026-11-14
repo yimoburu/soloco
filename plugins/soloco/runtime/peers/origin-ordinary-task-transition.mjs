@@ -184,7 +184,14 @@ function assertOrdinaryEffectEventFrom(tx,e,qualification_ref){
   effectNeed(Buffer.byteLength(canonical(value.content))<=64000&&Array.isArray(value.dependencies)&&value.dependencies.length<=100&&Array.isArray(context.sources));
   const supplied=context.sources.map(source=>ref(source.family,source)),base=supplied.find(source=>source.family==='homes'&&source.id===value.home_id)??null;
   effectNeed(same(value.base,base)&&same(value.readset,supplied)&&same(value.membership,context.membership));
-  for(const dependency of value.dependencies){reference(dependency,'homes');effectNeed(supplied.some(source=>same(source,dependency)));}
+  for(const dependency of value.dependencies){
+   // The original proposal writer preserves supplied dependency metadata;
+   // only these four fields identify the admitted source. The complete DATA
+   // remains bound by the immutable output hash and exact command result.
+   effectNeed(dependency&&typeof dependency==='object'&&!Array.isArray(dependency));
+   const identity=reference({family:dependency.family,id:dependency.id,revision:dependency.revision,sha256:dependency.sha256},'homes');
+   effectNeed(supplied.some(source=>same(source,identity)));
+  }
   return;
  }
  // The disposition preserves exactly the handoff frozen into this task. Its
