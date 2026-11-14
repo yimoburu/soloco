@@ -16,6 +16,8 @@ import {prototypeAssignment} from './prototype.mjs';
 import * as original from './peers/prospective-local-worker-inventory-producer.mjs';
 import * as adapter from './adapters.mjs';
 import * as sandbox from './local-sandbox.mjs';
+import {prepareComparisonEvidenceCommitFrom,finalizeComparisonEvidenceCommitFrom} from './integrated-comparison-evidence.mjs';
+import {prepareComparisonTestCommitFrom,finalizeComparisonTestCommitFrom} from './integrated-comparison-test.mjs';
 
 // This route deliberately asserts no Original provenance. The only issuers are
 // actual Store write scopes. Public JSON, callback identity and error recovery
@@ -302,6 +304,10 @@ export function runtimeExecutionCommitCutoffFrom(store){
 export function commitRuntimeExecutionWriteFrom(store,witness){
   const w=writes.get(store);if(!w)return;
   const facts=inspectRuntimeStoreCommitWitnessFrom(witness,store);need(facts.scope===w.scope&&facts.root===w.loan.root,'COMMIT_WITNESS_REQUIRED');
+  // Both producers may have pending work even when this scope has no launch
+  // tokens. Finish their throwing preparation before any selected core arm.
+  const comparisonEvidenceCommit=prepareComparisonEvidenceCommitFrom(store,witness);
+  const comparisonTestCommit=prepareComparisonTestCommitFrom(store,witness);
   if(w.lane==='legacy'){
     need(w.sealed&&w.validated,'UNPERSISTED_REQUEST');const confirmations=[],ready=[];
     for(const token of w.tokens){
@@ -317,6 +323,9 @@ export function commitRuntimeExecutionWriteFrom(store,witness){
     for(const r of ready)r.committed=true;
   }else if(w.lane==='original')original.retainOriginalModelRequestCommitFrom(store,witness);
   w.lease.status='committed';
+  // Fixed private finalizers only flip the already prepared proof flags.
+  finalizeComparisonEvidenceCommitFrom(comparisonEvidenceCommit);
+  finalizeComparisonTestCommitFrom(comparisonTestCommit);
 }
 // Historical REQUEST facts only, minted by the fixed Store post-COMMIT hook.
 // Reading them after close/consumption/failure never refreshes a launch token,
