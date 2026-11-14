@@ -46,14 +46,23 @@ function unqualifiedLegacyClosureFixture(){
  // A fictional PREEXISTING legacy prefix, never a fresh Original genesis.
  // No adapter/model is launched and no Original token/Native authority exists.
  // The ordinary runtime helpers below produce only their narrow typed journal.
- const root=fs.mkdtempSync(path.join(base,'unqualified-legacy-')),session_id='synthetic-legacy-owner',job_id=id('legacy-job'),instance_id=id('legacy-engineer'),team=installedTeam(),at=stamp();
- const state={schema:SCHEMA,runtime_version:VERSION,plugin_version:VERSION,id:id('company'),name:'UNQUALIFIED legacy closure fixture',idea:'Synthetic persisted grammar only',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id,epoch:1},records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:at,updated_at:at,revision:0};
+ const root=fs.mkdtempSync(path.join(base,'unqualified-legacy-')),session_id='synthetic-legacy-owner',job_id=id('legacy-job'),instance_id=id('legacy-engineer'),team=installedTeam(),at=stamp(),historicalRows=10001;
+ const state={schema:SCHEMA,runtime_version:VERSION,plugin_version:VERSION,id:id('company'),name:'UNQUALIFIED legacy closure fixture',idea:'Synthetic persisted grammar only',phase:'Frame',mode:'preparation',paused:false,...team,team_sha256:teamHash(team),owner:{host:'codex',session_id,epoch:1},records:{},sessions:{},jobs:{},messages:[],notices:[],created_at:at,updated_at:at,revision:historicalRows};
  state.jobs[job_id]={id:job_id,instance_id,role:'engineer',host:'codex',epoch:1,status:'running',native_id:null,worker_pid:process.pid,started_at:at,created_at:at,coordination:bindCoordination(state,{resources:['legacy-original-output']})};
  const store=new Store(root,true);try{
   // Seed old DATA directly; invoking company.created would falsely claim fresh
-  // Original provenance. Normal migration/writers own every transition after it.
-  store.db.prepare('INSERT INTO company VALUES (1,?)').run(JSON.stringify(state));
-  store.db.prepare('INSERT INTO events(at,type,value)VALUES(?,?,?)').run(at,'controlled.preexisting_legacy',JSON.stringify({revision:0,owner:state.owner}));
+  // Original provenance. These 10001 unrelated historical event labels are
+  // SYNTHETIC/UNQUALIFIED DATA, not producer commits, observed termination,
+  // capacity evidence or authority. They have no normalized delta/private proof.
+  // Raw revisions 0..10001 anchor the same retained company revision BEFORE
+  // intake; normal migration/writers own every subsequent target transition.
+  store.db.exec('BEGIN');try{
+   store.db.prepare('INSERT INTO company VALUES (1,?)').run(JSON.stringify(state));
+   const insert=store.db.prepare('INSERT INTO events(at,type,value)VALUES(?,?,?)');
+   insert.run(at,'controlled.preexisting_legacy',JSON.stringify({revision:0,owner:state.owner}));
+   for(let revision=1;revision<=historicalRows;revision++)insert.run(at,'job.model_process.closed',JSON.stringify({revision,owner:state.owner,data_scope:'SYNTHETIC_UNQUALIFIED_PREEXISTING_ONLY',job_id:'unrelated-historical-job'}));
+   store.db.exec('COMMIT');
+  }catch(error){store.db.exec('ROLLBACK');throw error;}
   store.migrate();
  }finally{store.close();}
  engine.bind(root,session_id,'codex');
@@ -147,7 +156,12 @@ test('cancelled original invocation may close observationally while paused witho
 
 
 test('unrelated runtime journals do not consume the unqualified legacy target-job reconciliation inventory',()=>{
- const f=unqualifiedLegacyClosureFixture();appendUnrelatedRuntimeRows(f);
+ const f=unqualifiedLegacyClosureFixture();
+ withStore(f.root,store=>{
+  assert.equal(store.db.prepare("SELECT COUNT(*) AS n FROM events WHERE type='job.model_process.closed' AND json_extract(value,'$.data_scope')='SYNTHETIC_UNQUALIFIED_PREEXISTING_ONLY'").get().n,10001);
+  const where="type IN ('job.model_process.requested','job.model_process.born','job.model_process.closed') AND EXISTS(SELECT 1 FROM json_each(events.value,'$.storage_delta.changes') AS change WHERE json_extract(change.value,'$.after.family')='jobs' AND json_extract(change.value,'$.after.key')=?)";
+  assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM events WHERE '+where).get(f.job_id).n,3,'only the supported post-intake target lifecycle enters its bounded producer inventory');
+ });
  const before=read(f);assert.equal(before.original_execution_origin,undefined);assert.equal(before.jobs[f.job_id].original_execution_assignment,undefined);assert.equal(resourceClaims(before).length,1);
  withStore(f.root,store=>store.readSnapshot(()=>assert.throws(()=>inspectOriginalLocalExecutionInventoryFrom(store),error=>error.code==='ORIGINAL_EXECUTION_ORIGIN_REQUIRED')));
  const result=engine.control({root:f.root,session_id:f.session_id,expected_epoch:1,action:'reconcile_process_closure',job_id:f.job_id,source_instruction:'Controlled targeted readback; unrelated producer inventory is not proof.'},'codex');assert.equal(result.closure_reconciled,true);assert.equal(read(f).jobs[f.job_id].status,'failed');assert.equal(resourceClaims(read(f)).length,0);
