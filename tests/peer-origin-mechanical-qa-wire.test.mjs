@@ -169,6 +169,42 @@ test('a same-sequence replacement cannot substitute for the private pre-write hi
  }),e=>e===rollback));
  assert.equal(f.raw(),before);assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(attempted,attempted.jobs.old),null);
 });
+test('historical baseline snapshot preserves authenticated member order and accepts deeply frozen inert data',async t=>{
+ const f=await wireFixture(t),historical=copy(f.state());f.prepare();const original=copy(f.state().records[f.packet.packet_ref.id].origin_mechanical_qa.context_basis),reordered=Object.fromEntries(Object.entries(copy(original)).reverse()),before=f.raw();
+ const {sha256,...unsigned}=reordered;reordered.sha256=qaRawHash(JSON.stringify(unsigned));assert.notDeepEqual(Object.keys(reordered),Object.keys(original));
+ const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
+ for(const basis of [original,reordered]){
+  const bytes=JSON.stringify(basis);freeze(basis);
+  withStore(f.root,store=>store.readSnapshot(()=>{
+   assert.doesNotThrow(()=>readStorageIntake(store.db,basis));assert.equal(bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(store.db,historical,basis),true);
+   assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(historical,historical.jobs.old).historical_original,true);
+  }));assert.equal(JSON.stringify(basis),bytes);
+ }assert.equal(f.raw(),before);
+});
+test('executable baseline views cannot switch to an uncommitted cut or retain bookkeeping after rollback',async t=>{
+ const f=await wireFixture(t),before=f.raw(),rollback=Error('SYNTHETIC accessor rollback'),attempts=[],id='SYNTHETIC-uncommitted-assignment';let calls=0;
+ withStore(f.root,store=>{
+  const committed=store.readSnapshot(()=>captureStorageBaseline(store.db));
+  assert.throws(()=>store.transaction('job.queued',s=>{
+   const job={id,instance_id:'SYNTHETIC-uncommitted-instance',role:'qa',host:'codex',status:'queued',native_id:null,created_at:new Date().toISOString()};recordOriginalWorkerAssignmentFrom(store,s,job);s.jobs[id]=job;return s;
+  },{beforeCommit:(db,next)=>{
+   const staged=captureStorageBaseline(db);assert(staged.seq>committed.seq);
+   const getter=(target,key,first,second)=>Object.defineProperty(target,key,{enumerable:true,configurable:true,get(){calls++;return calls%2?first:second;}});
+   const variants=[
+    b=>{getter(b,'seq',committed.seq,staged.seq);getter(b,'event_sha256',committed.event_sha256,staged.event_sha256);return Object.freeze(b);},
+    b=>{getter(b.layout,'version',b.layout.version,staged.layout.version);return b;},
+    b=>{getter(b.entries,'0',b.entries[0],staged.entries[0]);return b;},
+    b=>{getter(b.entries[0],'sha256',b.entries[0].sha256,staged.entries[0].sha256);return b;},
+    b=>new Proxy(b,{ownKeys(){calls++;throw Error('Caller proxy must not run');}}),
+    b=>{b.entries=new Proxy(b.entries,{get(){calls++;throw Error('Nested caller proxy must not run');}});return b;},
+    b=>{b.toJSON=()=>{calls++;return staged;};return b;}
+   ];
+   for(const variant of variants){const attempted=copy(next),basis=variant(copy(committed));attempts.push(attempted);assert.throws(()=>bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(db,attempted,basis),code('ORIGINAL_EXECUTION_HISTORICAL_BASIS_DATA_REQUIRED'));assert.equal(calls,0);}
+   throw rollback;
+  }}),error=>error===rollback);
+ });
+ assert.equal(f.raw(),before);assert.equal(calls,0);for(const attempted of attempts)assert.equal(inspectOriginalWorkerAssignmentBookkeepingFrom(attempted,attempted.jobs[id]),null);
+});
 test('complete unique oversize and selected UTF8 Hold before packet, grant, queue or spend',async t=>{
  for(const options of [{utf8Limit:512},{changes:{mandatory_unique_semantics:'retain every UNKNOWN '.repeat(12000)}}]){
   const f=await wireFixture(t,options),before=f.raw();assert.throws(()=>f.prepare(),e=>['ORIGIN_MECHANICAL_QA_CONTEXT_CAPACITY','ORIGIN_MECHANICAL_QA_PROMPT_CAPACITY'].includes(e.code));assert.equal(f.raw(),before);const s=f.state();assert.equal(Object.values(s.records).filter(r=>/packet|grant|admission/.test(r.origin_mechanical_qa?.protocol??'')).length,0);assert.equal(Object.keys(s.jobs).length,1);assert.equal(s.original_grant.used_attempts,2);

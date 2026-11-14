@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
+import {types} from 'node:util';
 import {Store,originalStoreExecutionCustodyFrom,originalStoreRetainedCommitCutoffFrom,inspectRuntimeStoreCommitWitnessFrom,retainOriginalStoreCommitCutoffFrom as retainStoreCutoff} from '../store.mjs';
 import {readNormalized,readStorageIntake} from '../record-storage.mjs';
 import {prepareRuntimeOriginalModelAuthorityFrom,assertRuntimeOriginalModelAuthorityFrom} from '../runtime-execution.mjs';
@@ -244,25 +245,47 @@ export function bindOriginalWorkerAssignmentBookkeepingFrom(store,state){
   // accidentally skip the ordinary context-preservation obligations.
   try{const loan=originalStoreExecutionCustodyFrom(store),p=storedProjection(loan);if(!p?.origin)return null;const history=originalHistory(loan,{current:p});bindBookkeeping(state,history.origin,history.jobs,writes.get(store)?.lease??null);return true;}catch{return null;}
 }
+function historicalBaselineData(input){
+  const valid=ok=>need(ok,'HISTORICAL_BASIS_DATA_REQUIRED');
+  const scalar=value=>{valid(value===null||typeof value==='string'||typeof value==='boolean'||typeof value==='number'&&Number.isFinite(value)&&!Object.is(value,-0));return value;};
+  const object=(value,fields,children={})=>{
+    valid(value&&typeof value==='object'&&!types.isProxy(value)&&!Array.isArray(value)&&[Object.prototype,null].includes(Object.getPrototypeOf(value)));
+    const descriptors=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(descriptors);
+    valid(keys.length===fields.length&&keys.every(key=>typeof key==='string'&&fields.includes(key)&&descriptors[key].enumerable&&own(descriptors[key],'value')));
+    // Iterate the original member order: baseline seals authenticate JSON
+    // bytes. Reading descriptor values never invokes caller getters/toJSON.
+    return Object.fromEntries(keys.map(key=>[key,own(children,key)?children[key](descriptors[key].value):scalar(descriptors[key].value)]));
+  };
+  const entries=value=>{
+    valid(value&&typeof value==='object'&&!types.isProxy(value)&&Array.isArray(value)&&Object.getPrototypeOf(value)===Array.prototype);
+    const descriptors=Object.getOwnPropertyDescriptors(value),keys=Reflect.ownKeys(descriptors),length=descriptors.length?.value;
+    valid(nat(length)&&length<=MAX_ROWS&&keys.length===length+1&&keys.every(key=>key==='length'||typeof key==='string'&&/^(0|[1-9][0-9]*)$/.test(key)&&Number(key)<length&&descriptors[key].enumerable&&own(descriptors[key],'value')));
+    return Array.from({length},(_,index)=>object(descriptors[String(index)].value,['family','key','position','sha256','encoding']));
+  };
+  return object(input,['version','layout','entries','root','seq','event_sha256','sha256'],{layout:value=>object(value,['version','identity']),entries});
+}
 export function bindOriginalHistoricalWorkerAssignmentBookkeepingFrom(actualDb,state,basis){
   const loan=originalStoreExecutionCustodyFrom(actualDb);
+  // One inert snapshot is used by every later guard. Freezing a caller object
+  // would still let its accessors switch from a committed cut to a staged one.
+  const baseline=historicalBaselineData(basis);
   return check(loan,()=>{
     // Authenticate the complete immutable baseline and its continuation in
     // this actual Store. Caller JSON alone never establishes provenance.
-    readStorageIntake(loan.db,basis);
+    readStorageIntake(loan.db,baseline);
     need(state&&typeof state==='object'&&!Array.isArray(state),'HISTORICAL_STATE_CHANGED');
-    const originalAtCut=basis.entries.some(row=>row.family==='root'&&row.key==='original_execution_origin');
+    const originalAtCut=baseline.entries.some(row=>row.family==='root'&&row.key==='original_execution_origin');
     need(own(state,'original_execution_origin')===originalAtCut,'HISTORICAL_STATE_CHANGED');
     if(!originalAtCut)return null;
     // The immutable cut must precede this write. An uncommitted tail could
     // otherwise acquire a lease-free historical proof and survive rollback.
     if(loan.mode==='write'){
       const writing=writes.get(loan.store);
-      need(writing?.history&&basis.seq<=writing.history.event_sequence,'HISTORICAL_CUT_UNCOMMITTED');
+      need(writing?.history&&baseline.seq<=writing.history.event_sequence,'HISTORICAL_CUT_UNCOMMITTED');
       const anchor=query(loan,'SELECT seq,at,type,value FROM events WHERE seq=?','get',writing.history.event_sequence);
       need(anchor&&hash(JSON.stringify([anchor.seq,anchor.at,anchor.type,anchor.value]))===writing.history.event_sha256,'HISTORICAL_CUT_CHANGED');
     }
-    const history=originalHistory(loan,{historicalCut:basis});
+    const history=originalHistory(loan,{historicalCut:baseline});
     need(same({id:state.id,origin:state.original_execution_origin,jobs:state.jobs??{},upgrades:upgradeProjection(state)},
       {id:history.id,origin:history.origin,jobs:history.jobs,upgrades:history.upgrades}),'HISTORICAL_STATE_CHANGED');
     // Factual metadata only: no live write lease, reservation or launch token.
