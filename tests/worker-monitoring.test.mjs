@@ -13,10 +13,10 @@ import {assignmentContext} from '../plugins/soloco/runtime/context.mjs';
 import {operatingContext} from '../plugins/soloco/runtime/operating-state.mjs';
 import {developmentAssignment} from '../plugins/soloco/runtime/develop.mjs';
 import {sandboxProfile} from '../plugins/soloco/runtime/local-sandbox.mjs';
-import {executionTiming} from '../plugins/soloco/runtime/timeout.mjs';
 import {work} from '../plugins/soloco/runtime/worker.mjs';
-import {recordOriginalWorkerAssignmentFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
-import {launchOriginalWorker,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
+import {recordOriginalWorkerAssignmentFrom,inheritOriginalWorkerAssignmentBookkeepingFrom} from '../plugins/soloco/runtime/peers/prospective-local-worker-inventory-producer.mjs';
+import {startOriginalModel,disposeOriginalProcessFixtures} from './original-worker-model-fixture.mjs';
+import {stageOriginalWorker} from './original-adapter-process-fixture.mjs';
 
 // These fixtures exercise real Engine, normalized Store, context and worker
 // transitions. All model outputs/semantic judgments are explicit fictional
@@ -26,7 +26,35 @@ const instruction='Only this fictional bounded preparation; no external executio
 const future=ms=>new Date(Date.now()+ms).toISOString();
 const hash=value=>digest(JSON.stringify(value));
 const result=(job,extra={})=>({native_id:'fictional-monitor-'+job.id,text:JSON.stringify({content:'FICTIONAL bounded monitor fixture output; no native acceptance.',messages:[],notices:[],...extra})});
-const spawn=(timeout,options)=>options.onSpawn?.(executionTiming(Date.now(),{timeout_ms:timeout,timeout_reason:options.timeoutReason}));
+function jsonState(state){
+  const copy=JSON.parse(JSON.stringify(state));
+  // Preserve the DTO roundtrip while carrying only the genuine snapshot's
+  // passive bookkeeping. This does not issue or replace a launch capability.
+  assert.equal(inheritOriginalWorkerAssignmentBookkeepingFrom(state,copy),true);
+  return copy;
+}
+async function workMonitored(root,jobId,callback){
+  // Install the carrier after any nested fixture boundaries are in place.
+  const carrier=stageOriginalWorker(root,jobId),modelDirectories=new Set();
+  try{
+    return await work(root,jobId,async(...args)=>{
+      const options={...args[6]};delete options.sessionTitle;delete options.sessionNameDirectory;
+      modelDirectories.add(args[3]);
+      const model=startOriginalModel([...args.slice(0,6),options],{nativeId:'fictional-monitor-'+jobId});
+      // A callback error deliberately leaves this actual model's closure
+      // UNKNOWN. Cleanup abandons its mock scope without emitting a close.
+      model.promise.catch(()=>{});
+      const output=await callback(...args);
+      model.respond(output.text);
+      // Adapter failures remain outside the callback assertion catch, and the
+      // real adapter's paired observers must complete before work can publish.
+      return model.promise;
+    });
+  }finally{
+    carrier.dispose();
+    for(const directory of modelDirectories)disposeOriginalProcessFixtures(directory);
+  }
+}
 
 async function fixedCapabilityBoundary(fn){
   // engine.open/plan may inspect the local execution capability. This fixture
@@ -133,9 +161,7 @@ async function operating(f,{validUntil=null,homeExpires=null,dependencyExpires=n
   if(reviewOnly)return {job:queued,plan};
   const packet=assignmentContext(f.read(),f.read().jobs[queued.id]),evidence=packet.operating_evidence;
   const ranges=evidence?Object.values(evidence.sources).flatMap(source=>{const out=[];for(let offset=0;offset<source.length;offset+=16000)out.push({source_id:source.source_id,sha256:source.sha256,offset,length:Math.min(16000,source.length-offset)});return out;}):[];
-  let first=true;
-  await work(f.args.root,queued.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
-    if(first){spawn(timeout,options);first=false;}
+  await workMonitored(f.args.root,queued.id,async()=>{
     if(ranges.length)return {native_id:'fictional-monitor-'+queued.id,text:JSON.stringify({reads:ranges.splice(0,4)})};
     return result(queued,{review:{verdict:'Pass',reason:'FICTIONAL semantic judgment only.',permitted_action:'publish_operating_state',plan_sha256:hash(f.read().records[plan.id].operating_plan),preservation_complete:true,interaction_complete:true,authority_checked:true,blockers:[]}});
   });
@@ -154,7 +180,6 @@ async function development(f){
   // the actual development admission, without launching a development test.
   const key='fictional-development-'+(++f.sequence),instance='fictional-instance-'+key;
   f.change((s,db)=>{const job={id:key,role:'engineer',instance_id:instance,session_key:instance,host:'codex',native_id:null,epoch:1,status:'queued',task:'Honor the complete fictional development scope.',inputs:[],review_of:null,development_id:plan.id,created_at:new Date().toISOString()};developmentAssignment(s,job,true,f.args.root);recordOriginalWorkerAssignmentFrom(db,s,job);const context=assignmentContext(s,job);s.jobs[key]={...job,inputs:context.inputs,context_sha256:context.hash};s.sessions[instance]={instance_id:instance,role:'engineer',host:'codex',native_id:null};},'job.queued');
-  launchOriginalWorker(f.args.root,key);
   return {job:{id:key},plan,files:[{path:'sum.mjs',content:'export const sum = values => values.reduce((a,b)=>a+b,0);\n'},{path:'sum.test.mjs',content:"import test from 'node:test';test('fictional source only',()=>{});\n"}]};
 }
 
@@ -178,9 +203,9 @@ async function monitoring(fn){
 }
 async function controlled(f,job,control,invoke,{files,review}={}){
   let entered=false,completed=false,callbackFailed=false,callbackError;
-  await work(f.args.root,job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{
+  await workMonitored(f.args.root,job.id,async(_h,_n,_p,_d,_timeout,_s,options)=>{
     try{
-      spawn(timeout,options);control.tick();
+      control.tick();
       assert.equal(options.signal.aborted,false,'the worker must be healthy before the monitor stimulus');
       entered=true;await invoke(options);completed=true;
       return result(job,{...(files?{files}:{}),...(review?{review}: {})});
@@ -216,7 +241,7 @@ test('revisionless public controls retain exact nullable inputs through JSON, co
     const {job}=specialist(f),state=f.read(),controls=Object.values(state.records).filter(r=>r.kind==='decision'&&['pause','resume'].includes(r.action));
     assert.equal(controls.length,2,'the real public pause/resume setup remains present');
     for(const record of controls)assert.equal(Object.hasOwn(record,'revision'),false,'canonical public control rows remain revisionless');
-    const roundtrip=JSON.parse(JSON.stringify(state)),current=roundtrip.jobs[job.id],packet=assignmentContext(roundtrip,current);
+    const roundtrip=jsonState(state),current=roundtrip.jobs[job.id],packet=assignmentContext(roundtrip,current);
     assert.equal(packet.hash,current.context_sha256);assert.deepEqual(packet.inputs,current.inputs);
     for(const input of current.inputs)assert.deepEqual(Object.keys(input).sort(),['id','revision'],'input DTOs have exactly two keys');
     for(const record of controls)assert.deepEqual(current.inputs.find(ref=>ref.id===record.id),{id:record.id,revision:null});
@@ -233,7 +258,7 @@ test('revisionless public controls retain exact nullable inputs through JSON, co
     await monitoring(async control=>{done=await controlled(f,job,control,async options=>{assert.equal(options.signal.aborted,false);});assert.equal(done.status,'completed',done.error);assert.equal(control.live(),0);});
     const review=engine.dispatch({...f.args,role:'qa',review_of:done.artifact_id,task:'Independently review the fictional specialist output without accepting it.'},'codex',launch);
     const assertReviewInputs=(selected,nullableInputs)=>{
-      const queued=f.read(),reviewJob=queued.jobs[selected.id],reviewPacket=assignmentContext(JSON.parse(JSON.stringify(queued)),JSON.parse(JSON.stringify(reviewJob)));
+      const queued=f.read(),reviewJob=queued.jobs[selected.id],reviewPacket=assignmentContext(jsonState(queued),JSON.parse(JSON.stringify(reviewJob)));
       assert.equal(reviewPacket.hash,reviewJob.context_sha256);
       for(const record of controls){
         const ref=reviewJob.inputs.find(value=>value.id===record.id);
@@ -494,9 +519,9 @@ test('two live workers keep separate root stamps, deadlines and timer cleanup',{
         let releaseA,releaseB,readyA,readyB;const enteredA=new Promise(resolve=>{readyA=resolve;}),enteredB=new Promise(resolve=>{readyB=resolve;});
         let runA,runB;
         try{
-          runA=work(first.args.root,a.job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick(0);readyA(options);await new Promise(resolve=>{releaseA=resolve;});return result(a.job);});
+          runA=workMonitored(first.args.root,a.job.id,async(_h,_n,_p,_d,_timeout,_s,options)=>{control.tick(0);readyA(options);await new Promise(resolve=>{releaseA=resolve;});return result(a.job);});
           const optionsA=await Promise.race([enteredA,runA.then(()=>null)]);assert.ok(optionsA,'first worker must enter its injected model');
-          runB=work(second.args.root,b.job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick(1);readyB(options);await new Promise(resolve=>{releaseB=resolve;});return result(b.job);});
+          runB=workMonitored(second.args.root,b.job.id,async(_h,_n,_p,_d,_timeout,_s,options)=>{control.tick(1);readyB(options);await new Promise(resolve=>{releaseB=resolve;});return result(b.job);});
           const optionsB=await Promise.race([enteredB,runB.then(()=>null)]);assert.ok(optionsB,'second worker must enter its injected model');
           assert.equal(optionsA.signal.aborted,false);assert.equal(optionsB.signal.aborted,false);assert.equal(control.live(),2);
           t.mock.timers.tick(start+60000-Date.now());control.tick(0);control.tick(1);assert.equal(optionsA.signal.aborted,true);assert.equal(optionsB.signal.aborted,false);
@@ -511,9 +536,13 @@ test('an injected model error still clears its actual monitor and retains a fail
     const {job}=specialist(f);
     await monitoring(async control=>{
       let entered=false;
-      await work(f.args.root,job.id,async(_h,_n,_p,_d,timeout,_s,options)=>{spawn(timeout,options);control.tick();assert.equal(options.signal.aborted,false);entered=true;throw Error('FICTIONAL injected model error; closure unknown.');});
+      await workMonitored(f.args.root,job.id,async(_h,_n,_p,_d,_timeout,_s,options)=>{control.tick();assert.equal(options.signal.aborted,false);entered=true;throw Error('FICTIONAL injected model error; closure unknown.');});
       assert.equal(entered,true,'the intended injected model error must actually be exercised');
       const stopped=held(f,job);assert.equal(stopped.status,'failed');assert.equal(control.live(),0);assert.match(stopped.error,/FICTIONAL injected model error/);
+      const invocation=stopped.model_process_tracking?.invocations.at(-1);
+      assert.ok(invocation?.birth,'the failed callback had an observed original model birth');
+      assert.equal(invocation.closure,null,'the injected error never observes a model close');
+      assert.notEqual(stopped.coordination_release?.termination_confirmed,true);
     });
   });
 });
