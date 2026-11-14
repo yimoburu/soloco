@@ -11,6 +11,90 @@ const HOST=fileURLToPath(new URL('../plugins/soloco/runtime/peers/input-frontier
 const NATIVE='00000000-0000-7000-8000-000000000001',TURN='00000000-0000-7000-8000-000000000002',SHA='1'.repeat(64),OUTPUT='SYNTHETIC bounded frontier output';
 const flush=()=>new Promise(r=>setImmediate(r));
 
+// Exact 439f8e73 Source import contracts, including named bindings and aliases.
+// A changed predecessor requires an explicit fixture review, never a count bump.
+const SOURCE_IMPORTS=Object.freeze({
+  "HOST": [
+    "import {TextDecoder} from 'node:util';",
+    "import {canonical} from './ledger.mjs';",
+    "import {parseGatewayJSON} from './gateway-wire.mjs';",
+    "import {FRONTIER_INSTRUCTION} from './input-frontier.mjs';",
+    "import {inputFrontierReadonly3Tools,originalInputFrontierPreflightInput} from './input-frontier-wire.mjs';",
+    "import {inspectOriginalPeerInputFrontier,assertOriginalPeerInputFrontier,originalPeerInputFrontierPreflight,bindOriginalPeerInputFrontierNative,originalPeerInputFrontierChannel} from './input-frontier-maintenance.mjs';",
+    "import * as domain from './protected-codex-domain.mjs';"
+  ],
+  "ENTRY": [
+    "import fs from 'node:fs';",
+    "import path from 'node:path';",
+    "import {types} from 'node:util';",
+    "import {canonical,peerDigest,PeerLedger} from './ledger.mjs';",
+    "import {loadOriginalSelectedPackagedPeerBridge,inspectOriginalInputFrontierSupport,createOriginalLoadedBootstrapMembershipRuntime} from './context-component-deployment.mjs';",
+    "import {createPolicySupervisor} from './policy-supervisor.mjs';",
+    "import {prepareOriginalProtectedInputFrontierLaunch,requestOriginalProtectedCodexStop} from './protected-codex-domain.mjs';",
+    "import {originalPeerInputFrontierMaintenanceLedger,prepareOriginalPeerInputFrontier,inspectOriginalPeerInputFrontier,originalPeerInputFrontierPreflight,completeOriginalPeerInputFrontier,holdOriginalPeerInputFrontier,recordOriginalPeerInputFrontierLateEvidence} from './input-frontier-maintenance.mjs';",
+    "import {runOriginalInputFrontierHost} from './input-frontier-host.mjs';",
+    "import * as originHost from './origin-maintenance-host.mjs';",
+    "import * as originRange from './origin-maintenance.mjs';",
+    "import * as originSeal from './origin-frontier-seal.mjs';",
+    "import * as ownerReview from './owner-handover.mjs';",
+    "import * as ordinaryReview from './origin-ordinary-task.mjs';",
+    "import {inspectOriginalOriginOrdinaryTaskSupport as ordinaryOriginSupport} from './context-component-deployment.mjs';",
+    "import {prepareOriginalProtectedOriginOrdinaryTaskLaunch} from './protected-codex-domain.mjs';",
+    "import {closed as bootstrapClosed,bootstrapActor,bootstrapPhaseInput,text as bootstrapText} from './bootstrap-membership-contract.mjs';",
+    "import {assertPeerBootstrapOperationFrom} from './bootstrap-membership-context.mjs';"
+  ],
+  "DOMAIN": [
+    "import {ORIGINAL_CONTEXT_SELECTION,resolveOriginalPeerContextInterpreter,assertOriginalPeerContextInterpreterFinal,assertOriginalPeerContextSlot,inspectOriginalPeerContextInterpreter} from './protected-source-build-slot.mjs';",
+    "import {originalPeerContextDeliveryInterpreter,inspectOriginalPeerContextDelivery,peerContextTurnInput} from './peer-context-interpreter.mjs';",
+    "import fs from 'node:fs';",
+    "import {EventEmitter} from 'node:events';",
+    "import {Writable,PassThrough} from 'node:stream';",
+    "import {randomBytes,createHash} from 'node:crypto';",
+    "import {TextDecoder,types} from 'node:util';",
+    "import {canonical,PeerLedger} from './ledger.mjs';",
+    "import {assertOriginalPeerMaintenanceExecutionCapacityFrom as assertInventory,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom as assertInventoryInTransaction,claimOriginalPeerExecutionLaunchFrom,bindOriginalPeerExecutionLaunchCutoffFrom,spawnOriginalPeerExecutionLaunch,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure} from './prospective-local-worker-inventory-producer.mjs';",
+    "import * as originalInventory from './prospective-local-worker-inventory-producer.mjs';",
+    "import * as model from './model.mjs';",
+    "import * as frontierSlots from './protected-source-build-slot.mjs';",
+    "import * as originalExecutionDomain from './protected-codex-domain.mjs';",
+    "import {INPUT_FRONTIER_CONTEXT_SELECTION,INPUT_FRONTIER_PROFILE,inputFrontierReadonly3Tools,inputFrontierResponsesTools,inspectOriginalInputFrontierPreflight,originalInputFrontierPreflightInterpreter,originalInputFrontierPreflightInput} from './input-frontier-wire.mjs';",
+    "import {originalPeerInputFrontierMaintenanceLedger,inspectOriginalPeerInputFrontier,assertOriginalPeerInputFrontier,originalPeerInputFrontierPreflight} from './input-frontier-maintenance.mjs';",
+    "import * as originWire from './origin-maintenance-wire.mjs';",
+    "import * as originMaintenance from './origin-maintenance.mjs';",
+    "import * as originSeal from './origin-frontier-seal.mjs';",
+    "import * as ownerMaintenance from './owner-handover.mjs';",
+    "import * as ordinaryOrigin from './origin-ordinary-task.mjs';",
+    "import {inspectOriginalOriginOrdinaryTaskSupport as inspectOrdinarySourceTuple} from './context-component-deployment.mjs';",
+    "import {parseGatewayJSON} from './gateway-wire.mjs';",
+    "import {createOriginalControlTranscript,createOriginalInputFrontierControlTranscript,createOriginalOriginMaintenanceControlTranscript,createOriginalOriginFinalReviewControlTranscript,createOriginalOriginOrdinaryTaskControlTranscript,parseOriginalControlFrame} from './protected-context-channel.mjs';",
+    "import {createFixedConnectBroker} from './protected-connect-broker.mjs';",
+    "import {stableTaskHostTools} from './host-protocol.mjs';",
+    "import {expectedResponsesTools} from './responses-gateway.mjs';",
+    "import {inspectOriginalCompiledCodexPlan,claimOriginalCompiledCodexPlan,originalCompiledPeerContextInterpreter} from './policy-supervisor.mjs';",
+    "import {inspectOriginalCompiledBootstrapScope} from './policy-supervisor.mjs';",
+    "import {isOriginalBootstrapMembershipInterpreter,assertOriginalBootstrapMembershipInterpreterFinal,inspectOriginalBootstrapMembershipInterpreter,assertOriginalBootstrapMembershipSlot,originalBootstrapCompanionSlotMatches} from './protected-source-build-slot.mjs';",
+    "import {BOOTSTRAP_PROFILE,BOOTSTRAP_CONTEXT_SELECTION,bootstrapReadonly3Tools} from './bootstrap-membership-delivery-frame.mjs';",
+    "import {originalBootstrapMembershipPreflightInterpreter,originalBootstrapMembershipPreflightInput,assertOriginalBootstrapMembershipPreflightInput,inspectOriginalBootstrapMembershipPreflight} from './bootstrap-membership-preflight.mjs';",
+    "import {assertOriginalPeerBootstrapMembershipRunner,originalPeerBootstrapMembershipRunnerDeadline,originalPeerBootstrapMembershipRunnerLedger,originalPeerBootstrapMembershipRunnerPreflight} from './bootstrap-membership.mjs';",
+    "import {createOriginalBootstrapControlTranscript,parseOriginalBootstrapControlFrame} from './protected-context-channel.mjs';"
+  ]
+});
+function relocateSourceImports(original,sourcePath,kind,replacements){
+ const lines=original.split('\n'),imports=lines.filter(line=>line.startsWith('import '));
+ assert.deepEqual(imports,SOURCE_IMPORTS[kind],kind+' exact permitted import declarations');
+ const seen=new Set(),relocated=lines.map(line=>{
+  if(!line.startsWith('import '))return line;
+  const match=line.match(/^(import .* from )'([^']+)';$/);assert.ok(match,'the selected Source import grammar is closed');
+  const [,prefix,name]=match;
+  if(replacements.has(name)){seen.add(name);return prefix+JSON.stringify(replacements.get(name))+';';}
+  return name.startsWith('./')?prefix+JSON.stringify(new URL(name,pathToFileURL(sourcePath)).href)+';':line;
+ }).join('\n');
+ assert.deepEqual([...seen].sort(),[...replacements.keys()].sort(),kind+' exact replaced predecessor modules');
+ const body=value=>value.split('\n').filter(line=>!line.startsWith('import ')).join('\n');
+ assert.equal(body(relocated),body(original),'the entire production module body remains exact');
+ return relocated;
+}
+
 async function fixture(t,{entry=false}={}){
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-frontier-source-test-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
  const shim=path.join(directory,'SYNTHETIC-predecessors.mjs');
@@ -40,12 +124,11 @@ export function spawnOriginalProtectedCodex(o,l){if(typeof o!=='symbol'||l!==lau
 export function originalProtectedOwnedTaskTokens(){return {creation:creationReady?creation:null,drain:child.closed&&terminal&&submitted!==null&&counts.normal_eof===1&&!counts.stop&&!suppressDrain?drain:null,diagnostic:counts.stop?diagnostic:null};}
 export function requestOriginalProtectedCodexStop(){counts.stop++;child.close(null,'SIGTERM');}
 export function originalPeerInputFrontierMaintenanceLedger(a){if(a!==api)throw Error('SYNTHETIC_API');counts.ledger++;return ledger;}
-export function prepareOriginalPeerInputFrontier(){counts.prepare++;return cap;}export function loadOriginalSelectedPackagedPeerBridge(){counts.load++;}export function inspectOriginalInputFrontierSupport(){}export function createPolicySupervisor(){throw Error('SYNTHETIC_UNSELECTED');}export function prepareOriginalProtectedInputFrontierLaunch(){throw Error('SYNTHETIC_UNSELECTED');}export function completeOriginalPeerInputFrontier(){throw Error('SYNTHETIC_UNSELECTED');}export function holdOriginalPeerInputFrontier(){throw Error('SYNTHETIC_UNSELECTED');}export function recordOriginalPeerInputFrontierLateEvidence(){throw Error('SYNTHETIC_UNSELECTED');}export function runOriginalInputFrontierHost(){throw Error('SYNTHETIC_UNSELECTED');}
+export function prepareOriginalPeerInputFrontier(){counts.prepare++;return cap;}export function loadOriginalSelectedPackagedPeerBridge(){counts.load++;}export function createOriginalLoadedBootstrapMembershipRuntime(){throw Error('SYNTHETIC_UNSELECTED_BOOTSTRAP');}export function inspectOriginalOriginOrdinaryTaskSupport(){throw Error('SYNTHETIC_UNSELECTED_ORDINARY');}export function prepareOriginalProtectedOriginOrdinaryTaskLaunch(){throw Error('SYNTHETIC_UNSELECTED_ORDINARY');}export function inspectOriginalInputFrontierSupport(){}export function createPolicySupervisor(){throw Error('SYNTHETIC_UNSELECTED');}export function prepareOriginalProtectedInputFrontierLaunch(){throw Error('SYNTHETIC_UNSELECTED');}export function completeOriginalPeerInputFrontier(){throw Error('SYNTHETIC_UNSELECTED');}export function holdOriginalPeerInputFrontier(){throw Error('SYNTHETIC_UNSELECTED');}export function recordOriginalPeerInputFrontierLateEvidence(){throw Error('SYNTHETIC_UNSELECTED');}export function runOriginalInputFrontierHost(){throw Error('SYNTHETIC_UNSELECTED');}
 `);
  const sourcePath=entry?ENTRY:HOST,original=fs.readFileSync(sourcePath,'utf8'),shimURL=pathToFileURL(shim).href;
- const replace=new Set(entry?['./context-component-deployment.mjs','./policy-supervisor.mjs','./protected-codex-domain.mjs','./input-frontier-maintenance.mjs','./input-frontier-host.mjs']:['./input-frontier-wire.mjs','./input-frontier-maintenance.mjs','./protected-codex-domain.mjs']);let replacements=0;
- const relocated=original.split('\n').map(line=>{const m=line.match(/^(import .* from )'([^']+)';$/);if(!m)return line;const [,prefix,name]=m;if(replace.has(name)){replacements++;return prefix+JSON.stringify(shimURL)+';';}return name.startsWith('./')?prefix+JSON.stringify(new URL(name,pathToFileURL(sourcePath)).href)+';':line;}).join('\n');
- assert.equal(replacements,entry?5:3);const body=s=>s.split('\n').filter(line=>!line.startsWith('import ')).join('\n');assert.equal(body(relocated),body(original));
+ const replaced=entry?['./context-component-deployment.mjs','./policy-supervisor.mjs','./protected-codex-domain.mjs','./input-frontier-maintenance.mjs','./input-frontier-host.mjs']:['./input-frontier-wire.mjs','./input-frontier-maintenance.mjs','./protected-codex-domain.mjs'];
+ const relocated=relocateSourceImports(original,sourcePath,entry?'ENTRY':'HOST',new Map(replaced.map(name=>[name,shimURL])));
  const copy=path.join(directory,entry?'entry.mjs':'host.mjs');fs.writeFileSync(copy,relocated);const module=await import(pathToFileURL(copy).href),synthetic=await import(shimURL);
  t.after(()=>synthetic.child.close(null,'SIGTERM'));return {module,s:synthetic,start(){return module.runOriginalInputFrontierHost(Symbol('SYNTHETIC owner'),synthetic.launch,synthetic.api,synthetic.cap);}};
 }
@@ -56,7 +139,8 @@ async function running(f){
 }
 function tool(f,name,args,id=name,extra={}){f.s.child.message({id,method:'item/tool/call',params:{threadId:NATIVE,turnId:TURN,callId:id,namespace:null,tool:name,arguments:args,...extra}});}
 function submit(f){tool(f,'soloco_context_header',{});tool(f,'soloco_context_read',{sha256:SHA,offset:0,length:4});tool(f,'soloco_context_submit',{sha256:SHA,content:OUTPUT});}
-function terminal(f,output=OUTPUT){f.s.child.message({method:'item/completed',params:{threadId:NATIVE,turnId:TURN,completedAtMs:0,item:{id:'final',type:'agentMessage',phase:'final_answer',text:output}}});f.s.child.message({method:'turn/completed',params:{threadId:NATIVE,turn:{id:TURN,status:'completed',error:null}}});}
+function finalItem(f,output=OUTPUT){f.s.child.message({method:'item/completed',params:{threadId:NATIVE,turnId:TURN,completedAtMs:0,item:{id:'final',type:'agentMessage',phase:'final_answer',text:output}}});}
+function terminal(f,output=OUTPUT){finalItem(f,output);f.s.child.message({method:'turn/completed',params:{threadId:NATIVE,turn:{id:TURN,status:'completed',error:null}}});}
 
 test('frontier actual host body conditionally completes only fresh-start readall submit exactfinal gracefulEOF and opaque drain',async t=>{
  const f=await fixture(t),{result}=await running(f);submit(f);terminal(f);const actual=await result;assert.equal(actual.error,null);assert.ok(actual.drain);assert.equal(f.s.counts.spawn,1);assert.equal(f.s.counts.normal_eof,1);assert.equal(f.s.counts.stop,0);assert.equal(f.s.counts.creation,1);
@@ -80,7 +164,7 @@ test('frontier incomplete coverage cannot submit or produce an accepted drain',a
  const f=await fixture(t),{result}=await running(f);tool(f,'soloco_context_submit',{sha256:SHA,content:OUTPUT});const actual=await result;assert.equal(actual.error,'SYNTHETIC_INCOMPLETE');assert.equal(actual.drain,null);
 });
 test('frontier final answer must equal the first attributed submission byte for byte',async t=>{
- const f=await fixture(t),{result}=await running(f);submit(f);terminal(f,OUTPUT+' changed');assert.equal((await result).error,'FRONTIER_HOST_FINAL_SUBMISSION');assert.equal(f.s.counts.normal_eof,0);
+ const f=await fixture(t),{result}=await running(f);submit(f);finalItem(f,OUTPUT+' changed');assert.equal((await result).error,'FRONTIER_HOST_FINAL_SUBMISSION');assert.equal(f.s.counts.normal_eof,0);assert.equal(f.s.counts.stop,1,'the rejected first final item stops the producer before another frame');
 });
 test('frontier unmatched RPC cannot start or continue a turn',async t=>{
  const f=await fixture(t),{result}=await running(f);f.s.child.message({id:'unmatched',result:{}});assert.equal((await result).error,'FRONTIER_HOST_RPC_REPLAY');
@@ -106,9 +190,12 @@ test('frontier production creation and drain interfaces reject copied facts and 
 // global inventory, ledger service and child predecessor explicitly SYNTHETIC.
 // No native executable, actual global coverage or company proof is manufactured.
 async function originalDomainFixture(t,{admissionMs=60000,beforeCreation,beforeRequest,stopAt,centralAvailable=true}={}){
- const file=fileURLToPath(new URL('../plugins/soloco/runtime/peers/protected-codex-domain.mjs',import.meta.url)),directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-frontier-domain-source-')),shim=path.join(directory,'SYNTHETIC-domain-predecessors.mjs');
+ const file=fileURLToPath(new URL('../plugins/soloco/runtime/peers/protected-codex-domain.mjs',import.meta.url)),directory=fs.mkdtempSync(path.join(os.tmpdir(),'soloco-frontier-domain-source-')),shim=path.join(directory,'SYNTHETIC-domain-predecessors.mjs'),copy=path.join(directory,'domain.mjs'),copyURL=pathToFileURL(copy).href;
+ let facade,s,original,timersEnabled=false;
+ t.after(async()=>{try{await s?.child.close();facade?.stdin.destroy();facade?.stdout.destroy();if(original!==undefined)assert.equal(fs.readFileSync(file,'utf8'),original);}finally{if(timersEnabled)t.mock.timers.reset();fs.rmSync(directory,{recursive:true,force:true});}});
  const peers=new URL('../plugins/soloco/runtime/peers/',import.meta.url),wireURL=new URL('input-frontier-wire.mjs',peers).href,ledgerURL=new URL('ledger.mjs',peers).href;
- fs.writeFileSync(shim,`import {EventEmitter} from 'node:events';import {PassThrough} from 'node:stream';
+ fs.writeFileSync(shim,`import assert from 'node:assert/strict';import {EventEmitter} from 'node:events';import {PassThrough} from 'node:stream';
+import * as copiedDomain from ${JSON.stringify(copyURL)};
 export {canonical} from ${JSON.stringify(ledgerURL)};
 export {INPUT_FRONTIER_CONTEXT_SELECTION,INPUT_FRONTIER_PROFILE,inputFrontierReadonly3Tools,inputFrontierResponsesTools} from ${JSON.stringify(wireURL)};
 export const ORIGINAL_CONTEXT_SELECTION={SYNTHETIC:true},interpreter=Object.freeze({SYNTHETIC:true}),compiledPlan=Object.freeze({SYNTHETIC:true}),api=Object.freeze({SYNTHETIC:true}),cap=Object.freeze({SYNTHETIC:true}),preflight=Object.freeze({SYNTHETIC:true});
@@ -125,17 +212,32 @@ export const slot={slot_id:'SYNTHETIC-frontier-slot',scope_policy:'V5_ORIGINAL_M
 const plan={launch_mode:'companion-v2',companion_slot:slot,executable_pin:{sha256:'a'.repeat(64)},sandbox_executable:'/SYNTHETIC/sandbox',executable:'/SYNTHETIC/companion',argv:[],sbpl:'SYNTHETIC policy',cwd:'/SYNTHETIC-project',state_root:'/SYNTHETIC-state',scratch_root:'/SYNTHETIC-scratch',gateway_port:43123,environment:{}};
 export function isOriginalInputFrontierInterpreter(h){return h===interpreter;}export function assertOriginalInputFrontierInterpreterFinal(h){if(h!==interpreter)throw Error('SYNTHETIC_INTERPRETER');}export function inspectOriginalInputFrontierInterpreter(h){assertOriginalInputFrontierInterpreterFinal(h);return {SYNTHETIC:true};}export function assertOriginalInputFrontierSlot(h,s){assertOriginalInputFrontierInterpreterFinal(h);if(JSON.stringify(s)!==JSON.stringify(slot))throw Error('SYNTHETIC_SLOT');}
 export function assertOriginalPeerContextInterpreterFinal(){throw Error('ordinary alias forbidden');}export function assertOriginalPeerContextSlot(){throw Error('ordinary alias forbidden');}export function inspectOriginalPeerContextInterpreter(){throw Error('ordinary alias forbidden');}export function resolveOriginalPeerContextInterpreter(){throw Error('ordinary alias forbidden');}export function originalCompanionSlotMatches(){return false;}
+export function isOriginalBootstrapMembershipInterpreter(){return false;}export function assertOriginalBootstrapMembershipInterpreterFinal(){throw Error('SYNTHETIC_UNSELECTED_BOOTSTRAP');}export function inspectOriginalBootstrapMembershipInterpreter(){throw Error('SYNTHETIC_UNSELECTED_BOOTSTRAP');}export function assertOriginalBootstrapMembershipSlot(){throw Error('SYNTHETIC_UNSELECTED_BOOTSTRAP');}export function originalBootstrapCompanionSlotMatches(){return false;}
+export function inspectOriginalCompiledBootstrapScope(){throw Error('SYNTHETIC_UNSELECTED_BOOTSTRAP');}
 let owner,claimed=false;export function install(o){owner=o;}const check=(o,h)=>{if(o!==owner||h!==compiledPlan)throw Error('SYNTHETIC_OWNER');};export function inspectOriginalCompiledCodexPlan(o,h){check(o,h);return {...plan,consumed:claimed};}export function claimOriginalCompiledCodexPlan(o,h){check(o,h);if(claimed)throw Error('SYNTHETIC_REPLAY');claimed=true;return plan;}export function originalCompiledPeerContextInterpreter(o,h){check(o,h);return interpreter;}
 export async function createFixedConnectBroker({owner,guard}){guard(owner,'listen');const facts={phase:'CLOSED',local_tcp_closure:'OBSERVED',remote_domain_closed:false};return {port:43123,closed:Promise.resolve(facts),close:async()=>facts};}
 class Child extends EventEmitter{constructor(){super();this.pid=424242;this.exitCode=null;this.signalCode=null;this.stdin=new PassThrough();this.stdout=new PassThrough();this.stderr=new PassThrough();this.stdio=[this.stdin,this.stdout,this.stderr,new PassThrough(),new PassThrough()];this.stdin.resume();this.controls=[];let buffer='';this.stdio[4].on('data',b=>{buffer+=b.toString();for(;;){const end=buffer.indexOf('\\n');if(end<0)break;this.controls.push(JSON.parse(buffer.slice(0,end)));buffer=buffer.slice(end+1);}});}kill(){return true;}async close(){if(this.exitCode!==null)return;this.exitCode=0;this.emit('exit',0,null);this.stdout.end();this.stderr.end();this.stdio[3].end();this.stdin.destroy();this.stdio[4].destroy();await new Promise(r=>setImmediate(r));this.emit('close',0,null);await new Promise(r=>setImmediate(r));}}
-export const child=new Child(),spawns=[];export let centralBindings=0;export let bindOriginalProtectedExecutionLaunch=${centralAvailable}?(o,h,actual,reference)=>{if(o!==owner||actual!==ledger||!h||reference.family!=='work_items')throw Error('SYNTHETIC_CENTRAL_ABI');centralBindings++;}:undefined;export function spawn(...args){if(centralBindings!==1)throw Error('SYNTHETIC_CENTRAL_ABI_REQUIRED_BEFORE_SPAWN');spawns.push(args);return child;}
+export const child=new Child(),spawns=[];export let centralBindings=0;
+// Only the explicitly missing-ABI negative imports this value. Positive cases
+// use the SAME copied domain's real binder and its private launch record.
+export const bindOriginalProtectedExecutionLaunch=undefined;
+const sourceToken=Object.freeze(Object.create(null));let cutoffLoan=null,cutoffFacts=null,spawned=false;
+export function claimOriginalPeerExecutionLaunchFrom(actual,{admission_ref}){assert.equal(actual,ledger);assert.deepEqual(admission_ref,reference);assert.equal(centralBindings,0,'one Synthetic Original-predecessor claim');assert.equal(capacityKnown,true);centralBindings++;return sourceToken;}
+export function bindOriginalPeerExecutionLaunchCutoffFrom(token,loan){assert.equal(token,sourceToken);assert.equal(centralBindings,1);assert.equal(cutoffLoan,null,'one cutoff loan');const facts=copiedDomain.inspectOriginalProtectedExecutionCutoffFrom(loan,token);assert.ok(Number.isSafeInteger(facts.deadline_at_ms)&&Date.now()<facts.deadline_at_ms);assert.equal(facts.signal.aborted,false);cutoffLoan=loan;cutoffFacts=facts;}
+export function spawnOriginalPeerExecutionLaunch(token,command,args,options){assert.equal(token,sourceToken);assert.equal(centralBindings,1);assert.ok(cutoffLoan);assert.equal(spawned,false,'one Synthetic child');const facts=copiedDomain.inspectOriginalProtectedExecutionCutoffFrom(cutoffLoan,token);assert.equal(facts.deadline_at_ms,cutoffFacts.deadline_at_ms);assert.equal(facts.signal,cutoffFacts.signal);assert.ok(Date.now()<facts.deadline_at_ms);assert.equal(facts.signal.aborted,false);assert.equal(command,plan.sandbox_executable);assert.deepEqual(args,['-p',plan.sbpl,plan.executable,...plan.argv]);assert.deepEqual(options,{cwd:plan.cwd,env:plan.environment,stdio:['pipe','pipe','pipe','pipe','pipe'],shell:false,detached:true});spawned=true;spawns.push([command,args,options]);return child;}
+export function assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom(){throw Error('SYNTHETIC_UNSELECTED_TRANSACTION');}
+export function originalWorkerFailedLaunchChild(){return null;}
+export function cleanupOriginalWorkerLaunchFailure(){throw Error('SYNTHETIC_UNSELECTED_FAILED_LAUNCH');}
 `);
- fs.writeFileSync(path.join(directory,'prospective-local-worker-inventory-producer.mjs'),'export {assertOriginalPeerMaintenanceExecutionCapacityFrom} from '+JSON.stringify(pathToFileURL(shim).href)+';\n');
- const original=fs.readFileSync(file,'utf8'),url=pathToFileURL(shim).href,replaced=new Set(['node:child_process','./protected-source-build-slot.mjs','./policy-supervisor.mjs','./ledger.mjs','./protected-connect-broker.mjs','./input-frontier-maintenance.mjs','./input-frontier-wire.mjs','./protected-codex-domain.mjs']);let count=0;
- const relocated=original.split('\n').map(line=>{const m=line.match(/^(import .* from )'([^']+)';$/);if(!m)return line;const [,prefix,name]=m;if(replaced.has(name)){count++;return prefix+JSON.stringify(url)+';';}return name.startsWith('./')?prefix+JSON.stringify(new URL(name,pathToFileURL(file)).href)+';':line;}).join('\n');assert.equal(count,9);
- const body=s=>s.split('\n').filter(line=>!line.startsWith('import ')).join('\n');assert.equal(body(relocated),body(original));const copy=path.join(directory,'domain.mjs');fs.writeFileSync(copy,relocated);
- const domain=await import(pathToFileURL(copy).href),s=await import(url),w=await import(wireURL),owner=Symbol('SYNTHETIC original frontier owner');s.install(owner);t.mock.timers.enable({apis:['setTimeout']});
- let facade;t.after(async()=>{try{await s.child.close();facade?.stdin.destroy();facade?.stdout.destroy();assert.equal(fs.readFileSync(file,'utf8'),original);}finally{t.mock.timers.reset();fs.rmSync(directory,{recursive:true,force:true});}});
+ const producerFile=path.join(directory,'prospective-local-worker-inventory-producer.mjs'),url=pathToFileURL(shim).href;
+ // Both producer import declarations and the fixed local-file presence check
+ // select this exact seven-binding Synthetic namespace, never the real issuer.
+ fs.writeFileSync(producerFile,'export {assertOriginalPeerMaintenanceExecutionCapacityFrom,assertOriginalPeerMaintenanceExecutionCapacityInTransactionFrom,claimOriginalPeerExecutionLaunchFrom,bindOriginalPeerExecutionLaunchCutoffFrom,spawnOriginalPeerExecutionLaunch,originalWorkerFailedLaunchChild,cleanupOriginalWorkerLaunchFailure} from '+JSON.stringify(url)+';\n');
+ original=fs.readFileSync(file,'utf8');const replaced=new Map(['./protected-source-build-slot.mjs','./policy-supervisor.mjs','./ledger.mjs','./protected-connect-broker.mjs','./input-frontier-maintenance.mjs','./input-frontier-wire.mjs'].map(name=>[name,url]));
+ replaced.set('./prospective-local-worker-inventory-producer.mjs',pathToFileURL(producerFile).href);
+ replaced.set('./protected-codex-domain.mjs',centralAvailable?copyURL:url);
+ const relocated=relocateSourceImports(original,file,'DOMAIN',replaced);fs.writeFileSync(copy,relocated);
+ const domain=await import(pathToFileURL(copy).href);s=await import(url);const w=await import(wireURL),owner=Symbol('SYNTHETIC original frontier owner');s.install(owner);t.mock.timers.enable({apis:['setTimeout']});timersEnabled=true;
  const handle=await domain.prepareOriginalProtectedInputFrontierLaunch(owner,{compile:()=>s.compiledPlan},{cwd:'/SYNTHETIC-project',read_paths:[],state_root:'/SYNTHETIC-state',scratch_root:'/SYNTHETIC-scratch'},s.preflight);domain.bindOriginalProtectedInputFrontierAdmission(owner,handle,s.api,s.cap);
  const config={cwd:'/SYNTHETIC-project',environment:{},profile_id:':read-only',instruction_sources:null,base_instructions:'SYNTHETIC base',developer_instructions:'SYNTHETIC developer'};domain.bindOriginalProtectedCodexLaunch(owner,handle,config);facade=domain.spawnOriginalProtectedCodex(owner,handle);facade.stdout.resume();const errors=[];facade.on('error',e=>errors.push(e));facade.stdin.on('error',e=>errors.push(e));s.child.emit('spawn');
  const sha=v=>createHash('sha256').update(v).digest('hex'),protocol='soloco-protected-backend-permit-v2',challenge=s.child.controls[0],host='11111111-1111-4111-8111-111111111111';
